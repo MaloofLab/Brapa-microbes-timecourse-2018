@@ -21,7 +21,7 @@ On the second download reads had not yet been concatenated across multiple lanes
     for f in $(ls *gz | sed s/_L.*// | uniq)
     do
         echo $f
-        cat $f* > concatenated/$f_R1_001.fastq.gz
+        cat $f* > concatenated/${f}_R1_001.fastq.gz
     done
     
 Then delete non-concatenated files and move the concatenated files up a directory level.
