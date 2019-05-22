@@ -14,6 +14,18 @@ Download command was:
 
     wget -r -nd http://slimsdata.genomecenter.ucdavis.edu/Data/mx7wuv39pp/Unaligned2/Project_JMMC_WYO004/
     
+## concatenate reads
+
+On the second download reads had not yet been concatenated across multiple lanes.  Concatenate with
+
+    for f in $(ls *gz | sed s/_L.*// | uniq)
+    do
+        echo $f
+        cat $f* > concatenated/$f_R1_001.fastq.gz
+    done
+    
+Then delete non-concatenated files and move the concatenated files up a directory level.
+    
 ## sample info
 
 See file `tube_no_legend_time_course_2018.xlsx`
