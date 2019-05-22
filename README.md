@@ -12,7 +12,7 @@ Julin Downloaded fastq files to Barbera /share/malooflab/Fastqs/Brapa_microbe/ti
 
 Download command was:
 
-    wget -r -nd http://slimsdata.genomecenter.ucdavis.edu/Data/mx7wuv39pp/Unaligned/Project_JMMC_WYO004/
+    wget -r -nd http://slimsdata.genomecenter.ucdavis.edu/Data/mx7wuv39pp/Unaligned2/Project_JMMC_WYO004/
     
 ## sample info
 
