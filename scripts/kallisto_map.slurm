@@ -8,7 +8,7 @@
 #SBATCH --time=0-00:10:00  # expected time of completion in hours, minutes, seconds, default 1-day
 #SBATCH --output=Kallisto_%A_%a.out # STDOUT
 #SBATCH --error=Kallisto_%A_%a.err # STDERR
-#SBATCH --mail-user=jnmaloof@ucdavis.edu #
+#SBATCH --mail-user=knozue@ucdavis.edu #
 #SBATCH --mail-type=ALL #
 
 # This will be run once for a single process
