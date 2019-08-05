@@ -388,7 +388,7 @@ $(document).ready(function () {
 ## ✖ dplyr::filter() masks stats::filter()
 ## ✖ dplyr::lag()    masks stats::lag()</code></pre>
 <p>get the kallisto-generated file names. These correspond to the file names from the sequencer.</p>
-<pre class="r"><code>files &lt;- dir(path = &quot;../Kallisto_output/&quot;, include.dirs = TRUE)
+<pre class="r"><code>files &lt;- dir(path = &quot;../input/Kallisto_output/&quot;, include.dirs = TRUE)
 kallisto_q &lt;- str_extract(files, pattern = &quot;q_[0-9]{3}&quot;) %&gt;% 
   str_replace(&quot;q&quot;, &quot;Q&quot;) %&gt;% #to match excel sheet
   str_replace(&quot;_(0){1,2}&quot;, &quot;_&quot;) %&gt;% # remove leading 0s to match excel sheet
@@ -432,7 +432,7 @@ kallisto_q</code></pre>
 ## [273] &quot;Q_75&quot;  &quot;Q_77&quot;  &quot;Q_8&quot;   &quot;Q_80&quot;  &quot;Q_81&quot;  &quot;Q_82&quot;  &quot;Q_83&quot;  &quot;Q_84&quot; 
 ## [281] &quot;Q_85&quot;  &quot;Q_86&quot;  &quot;Q_90&quot;  &quot;Q_91&quot;  &quot;Q_95&quot;  &quot;Q_96&quot;  &quot;Q_97&quot;  &quot;Q_98&quot;</code></pre>
 <p>read the key in</p>
-<pre class="r"><code>key &lt;- readxl::read_excel(&quot;../tube_no_legend_time_course_2018.xlsx&quot;)</code></pre>
+<pre class="r"><code>key &lt;- readxl::read_excel(&quot;../input/tube_no_legend_time_course_2018.xlsx&quot;)</code></pre>
 <pre><code>## New names:
 ## * sampling_day -&gt; sampling_day...11
 ## * sampling_day -&gt; sampling_day...12</code></pre>

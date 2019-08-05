@@ -7,7 +7,7 @@ library(tidyverse)
 get the kallisto-generated file names.  These correspond to the file names from the sequencer.
 
 ```{r}
-files <- dir(path = "../Kallisto_output/", include.dirs = TRUE)
+files <- dir(path = "../input/Kallisto_output/", include.dirs = TRUE)
 kallisto_q <- str_extract(files, pattern = "q_[0-9]{3}") %>% 
   str_replace("q", "Q") %>% #to match excel sheet
   str_replace("_(0){1,2}", "_") %>% # remove leading 0s to match excel sheet
@@ -18,7 +18,7 @@ kallisto_q
 
 read the key in
 ```{r}
-key <- readxl::read_excel("../tube_no_legend_time_course_2018.xlsx")
+key <- readxl::read_excel("../input/tube_no_legend_time_course_2018.xlsx")
 
 key
 ```
