@@ -1,0 +1,42 @@
+Checking how to reconcile kallisto file names and the excel key file
+
+```{r}
+library(tidyverse)
+```
+
+get the kallisto-generated file names.  These correspond to the file names from the sequencer.
+
+```{r}
+files <- dir(path = "../Kallisto_output/", include.dirs = TRUE)
+kallisto_q <- str_extract(files, pattern = "q_[0-9]{3}") %>% 
+  str_replace("q", "Q") %>% #to match excel sheet
+  str_replace("_(0){1,2}", "_") %>% # remove leading 0s to match excel sheet
+  sort()
+
+kallisto_q
+```
+
+read the key in
+```{r}
+key <- readxl::read_excel("../tube_no_legend_time_course_2018.xlsx")
+
+key
+```
+
+Does the q_# in kallisto correspond to tube #?
+```{r}
+tube_no <- key %>% pull(tube_no) %>% 
+  str_remove("_D8") #No "D8" in kallisto names
+
+kallisto_q[! kallisto_q %in% tube_no]
+
+tube_no[! tube_no %in% kallisto_q]
+```
+yes, all kallisto q #s are found in tube no, and alomst all tube #s are found in kallisto
+
+what about pot#
+```{r}
+kallisto_q[! kallisto_q %in% key$pot]
+```
+no, not a good match
+
