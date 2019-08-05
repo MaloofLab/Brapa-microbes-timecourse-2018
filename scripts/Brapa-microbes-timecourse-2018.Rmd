@@ -1,0 +1,105 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE,error=TRUE)
+#library(d3heatmap)
+#library(flexdashboard)
+library(edgeR);library(tidyverse)
+library(readr);library(readxl)
+library(stringr)
+#url <- "http://datasets.flowingdata.com/ppg2008.csv"
+#nba_players <- read.csv(url, row.names = 1)
+# functions for expression pattern
+source("../../../tools/Expression_pattern_graph.R",chdir=TRUE)
+```
+
+
+# sample info
+```{r}
+sample.description.2018<-read_xlsx(file.path("..","input","tube_no_legend_time_course_2018.xlsx")) # needs to specify cell type in sampling_day_specific and sampling_time_specific, but they are not used.
+str(sample.description.2018)
+names(sample.description.2018)
+# soil_trt: ATM_BLNK and SBC_OLD
+# sampling_day: 2, 3, 4,6,8,10,13,14 days (replicate numbers are different)
+sample.description.2018.s<-sample.description.2018 %>% dplyr::select("block","bench","genotype","soil_trt","sampling_day...11") %>% rename(sampling_day=sampling_day...11) %>% unite(group,soil_trt,sampling_day,sep=".",remove=FALSE)
+
+```
+
+# Get counts into R
+```{r}
+kallisto_files <- dir(path = "../input/Kallisto_output",pattern="abundance.tsv",recursive = TRUE,full.names = TRUE)
+kallisto_files
+getwd()
+kallisto_files2<-list.files(path="../input/Kallisto_output")
+kallisto_files2
+kallisto_names <- str_split(kallisto_files,"/",simplify=TRUE)[,3]
+kallisto_names
+# combine count data in list
+counts.list <- lapply(kallisto_files,read_tsv)
+names(counts.list) <- kallisto_files2
+counts.list[[1]]
+# combine counts data
+counts <- sapply(counts.list, dplyr::select, est_counts) %>% 
+  bind_cols(counts.list[[1]][,"target_id"],.) 
+counts[is.na(counts)] <- 0
+colnames(counts) <- sub(".est_counts","",colnames(counts),fixed = TRUE)
+counts
+counts.updated<-counts
+
+# write counts data
+write_csv(counts.updated,"../output/counts.updated.csv.gz")
+```
+
+# edgeR QLF
+```{r}
+#confirm that everthing is in the right order, but directory name is not matched to sample.description.2018... 
+length(names(counts.updated)) # 289
+dim(sample.description.2018.s) # 293...
+tail(sample.description.2018.s)
+sample.description.2018.s<-sample.description.2018.s %>% filter(!block=="na")# %>% dim() # 288 6 ....inconsistent
+tail(sample.description.2018.s)
+# what is missing? Extract "S***"
+# names(counts.updated) %>% str_split_fixed(pattern="_",n=5) %>% str_extract(pattern="^S+")
+# another strategy
+x<-names(counts.updated) %>% str_split_fixed(pattern="_",n=10)
+grep("(S[[:digit:]]+)",x,value = TRUE) %>% length() #288
+# sample.description.2018.s is correct
+# all(colnames(counts.updated)[-1]==sample.description.2018.s$sample) # needs to be fixed
+
+# folder corresond to Q***
+
+dge <- DGEList(counts.updated[,-1],
+               group=sample.description.2018.s$group,
+               samples=sample.description.2018.s,
+               genes=counts.updated$target_id)
+dge <- calcNormFactors(dge)
+barplot(dge$samples$lib.size)
+ggplot(dge$samples,aes(x=rownames(dge$samples),y=norm.factors)) + geom_col() + 
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5,size = 7)) 
+
+# load exp1 v3.0 annotation dge files and sample info
+# load(file.path("..","output","edgeR_dge_objects.e1.v3.0anno.RData"))
+# 
+# relevel trt and genotype to "5E_dead" and "FPsc"
+dge$samples<-dge$samples %>% mutate(soil_trt=fct_relevel(soil_trt,"ATM_BLANK")) #%>% str() 
+## dge
+design.add <- with(dge$samples, model.matrix(~ genotype + soil_trt + block))
+# estimateDisp
+root.dge.add <- estimateDisp(dge.root,design = root.design.add)
+# QL
+root.fit <- glmQLFit(root.dge.add, root.design.add)
+# to compare "trt5E_live" to "5E_dead"
+root.trt5E_live.add.qlf <- glmQLFTest(root.fit,coef="trt5E_live")
+root.trt5E_live.DEGs.add.rD.qlf.all <- topTags(root.trt5E_live.add.qlf,n = Inf,p.value = 1)$table
+## writing output table
+write.csv(root.trt5E_live.DEGs.add.rD.qlf.all,file=file.path("..","output","FULLtoptag","root.trt5E_live.DEGs.add.rD.rFPsc.QLF.v3.0anno.csv"))
+
+
+```
+
