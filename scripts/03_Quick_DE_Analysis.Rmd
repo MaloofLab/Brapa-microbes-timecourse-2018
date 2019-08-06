@@ -1,0 +1,82 @@
+---
+title: "03_Quick_DE_Analysis"
+output: html_document
+---
+
+Quick analysis to calculate the number of DE genes per timepoint.
+
+```{r}
+library(tidyverse)
+library(edgeR)
+```
+
+
+```{r}
+load("../output/timecourseDGE.Rdata")
+```
+
+```{r}
+dge$samples$day_time <- str_c(dge$samples$sampling_day,"-",dge$samples$sampling_time)
+unique(dge$samples$soil_trt)
+unique(dge$samples$genotype)
+unique(dge$samples$day_time)
+```
+
+creat a tibble to hold data and results
+```{r}
+results <- tibble(day_time=unique(dge$samples$day_time))
+results <- results %>%
+    separate(day_time, into=c("day", "time"), sep="-", remove=FALSE) %>%
+  mutate(dge=map(day_time, ~ dge[,dge$samples$day_time==.]))
+results
+```
+
+functions for calculating differential gene expression
+```{r}
+calcdisp <- function(dge) {
+  design <- model.matrix(~soil_trt + block, data=dge$samples)
+  dge <- estimateDisp(dge, design=design)
+  dge
+}
+
+calcLRT <- function(dge) {
+    design <- model.matrix(~soil_trt + block, data=dge$samples)
+    fit <- glmFit(dge, design)
+    lrt <- glmLRT(fit,coef = "soil_trtSBC_OLD")
+    lrt
+}
+
+calcDEG <- function(lrt) {
+  topTags(lrt, n=Inf, p.value = 0.05)
+}
+```
+
+```{r}
+results <- results %>% mutate(dge=map(dge, calcdisp))
+results <- results %>% mutate(lrt=map(dge, calcLRT))
+results <- results %>% mutate(DEG0.05=map(lrt, calcDEG))
+```
+
+```{r}
+results <- results %>%
+  mutate(n.DEG = map_int(DEG0.05, nrow))
+```
+
+```{r}
+resultssmall <- results %>%
+  select(-dge, -lrt) %>%
+  mutate(day_time = str_replace(day_time, "^([1-9]-)", "0\\1"),
+         day=as.numeric(day))
+
+resultssmall %>% arrange(day_time)
+```
+plot it
+```{r}
+resultssmall %>%
+  ggplot(aes(x=time, y=n.DEG)) +
+  geom_col() +
+  facet_grid(day ~ .)
+ggsave("../output/time_course_DEGs.png", height=6, width=8)
+```
+
+

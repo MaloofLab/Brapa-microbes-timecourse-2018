@@ -8,9 +8,7 @@ get the kallisto-generated file names.  These correspond to the file names from 
 
 ```{r}
 files <- dir(path = "../input/Kallisto_output/", include.dirs = TRUE)
-kallisto_q <- str_extract(files, pattern = "q_[0-9]{3}") %>% 
-  str_replace("q", "Q") %>% #to match excel sheet
-  str_replace("_(0){1,2}", "_") %>% # remove leading 0s to match excel sheet
+kallisto_q <- str_extract(files, pattern = "q_[0-9]{3}(_d8)?") %>% 
   sort()
 
 kallisto_q
@@ -26,17 +24,13 @@ key
 Does the q_# in kallisto correspond to tube #?
 ```{r}
 tube_no <- key %>% pull(tube_no) %>% 
-  str_remove("_D8") #No "D8" in kallisto names
+  tolower() %>%
+  str_replace("q_([1-9](_|$))", "q_00\\1") %>%
+  str_replace("q_([1-9][0-9](_|$))", "q_0\\1")
+tube_no
 
 kallisto_q[! kallisto_q %in% tube_no]
 
 tube_no[! tube_no %in% kallisto_q]
 ```
-yes, all kallisto q #s are found in tube no, and alomst all tube #s are found in kallisto
-
-what about pot#
-```{r}
-kallisto_q[! kallisto_q %in% key$pot]
-```
-no, not a good match
-
+yes, all kallisto q #s are found in tube no, and almost all tube #s are found in kallisto

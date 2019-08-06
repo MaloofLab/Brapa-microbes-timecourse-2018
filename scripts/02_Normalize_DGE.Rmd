@@ -1,0 +1,103 @@
+---
+title: "02_Normalize_Reads"
+output: html_notebook
+---
+
+Normalize reads and create DGE objects
+
+```{r}
+library(tidyverse)
+library(edgeR)
+```
+
+## get reads and create data frame
+
+```{r}
+files <- dir("../input/Kallisto_output/", include.dirs = TRUE)
+files %>% head()
+```
+
+```{r}
+counts.list <- map(files, ~ read_tsv(
+  file=file.path("..","input","Kallisto_output",.,"abundance.tsv"),
+  col_types = "cdddd"))
+names(counts.list) <- files
+```
+
+```{r}
+counts <- sapply(counts.list, select, est_counts) %>% 
+  bind_cols(counts.list[[1]][,"target_id"],.)
+counts[is.na(counts)] <- 0
+colnames(counts) <- sub(".est_counts","",colnames(counts),fixed = TRUE)
+counts
+```
+
+```{r}
+write_csv(counts,"../output/2018-timecourse_V3.0_raw_counts_.csv.gz")
+```
+
+## create sample description data frame
+
+```{r}
+key <- readxl::read_excel("../input/tube_no_legend_time_course_2018.xlsx",
+                          na=c("","na"),
+                          col_types=c("text", "text", "text", "skip", "text", "skip", "skip", "skip", "text", "text", "text", "skip", "text", "skip", "skip", "date", "date"))  %>%
+  mutate(sampling_time_specific=format(sampling_time_specific, format="%H:%M:%S"))
+key
+```
+
+create reformatted tube_no 
+```{r}
+key <- key %>%
+  mutate(tube_no_2 = {
+    tolower(tube_no) %>%
+      str_replace("q_([1-9](_|$))", "q_00\\1") %>%
+      str_replace("q_([1-9][0-9](_|$))", "q_0\\1") }) %>%
+  select(tube_no, tube_no_2, everything())
+key
+```
+
+```{r}
+samples <- tibble(
+  file=files,
+  tube_no_2 = str_extract(files, pattern = "q_[0-9]{3}(_d8)?") 
+)
+samples
+```
+
+```{r}
+samples <- left_join(samples, key) 
+samples <- samples %>%
+  mutate(group=str_c(genotype, soil_trt, sampling_day, sampling_time))
+samples
+```
+
+```{r}
+counts2 <- counts %>% 
+  as.data.frame() %>% 
+  column_to_rownames(var = "target_id") %>%
+  as.matrix() %>%
+  round(0)
+```
+
+```{r}
+samples2 <- samples %>%
+  select(-tube_no_2, -tube_no, -pot, -plant_no, -sampling_day_specific, -sampling_time_specific) %>%
+  as.data.frame() %>%
+  column_to_rownames(var="file")
+```
+
+```{r}
+dge <- DGEList(counts=counts2, samples=samples2, group=samples2$group)
+```
+
+## normalize
+
+```{r}
+dge <- calcNormFactors(dge)
+```
+
+```{r}
+save(dge, file="../output/timecourseDGE.Rdata")
+```
+
