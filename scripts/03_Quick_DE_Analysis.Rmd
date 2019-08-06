@@ -15,20 +15,28 @@ library(edgeR)
 load("../output/timecourseDGE.Rdata")
 ```
 
+check the experimental factors so that we know what we have
 ```{r}
 dge$samples$day_time <- str_c(dge$samples$sampling_day,"-",dge$samples$sampling_time)
-unique(dge$samples$soil_trt)
-unique(dge$samples$genotype)
-unique(dge$samples$day_time)
+
+cat("soil_trt: ", unique(dge$samples$soil_trt), "\n\n")
+cat("genotype: ", unique(dge$samples$genotype), "\n\n")
+cat("day_time: ", unique(dge$samples$day_time), "\n\n")
 ```
 
-creat a tibble to hold data and results
+Create a tibble to hold data and models.
+Each row of the tibble will correspond to one time point.
+Each row has a subsetted dge that corresponds to that time point.
 ```{r}
-results <- tibble(day_time=unique(dge$samples$day_time))
-results <- results %>%
+models <- tibble(day_time=unique(dge$samples$day_time))
+models <- models %>%
     separate(day_time, into=c("day", "time"), sep="-", remove=FALSE) %>%
   mutate(dge=map(day_time, ~ dge[,dge$samples$day_time==.]))
-results
+
+#Do NOT print the full models tibble to the screen, it slows everything way down!!
+#models
+
+models %>% select(-dge)
 ```
 
 functions for calculating differential gene expression
@@ -51,32 +59,36 @@ calcDEG <- function(lrt) {
 }
 ```
 
+Calculate dispersion, LRT, and Toptags (p < 0.05) for each time point
 ```{r}
-results <- results %>% mutate(dge=map(dge, calcdisp))
-results <- results %>% mutate(lrt=map(dge, calcLRT))
-results <- results %>% mutate(DEG0.05=map(lrt, calcDEG))
+models <- models %>% mutate(dge=map(dge, calcdisp))
+models <- models %>% mutate(lrt=map(dge, calcLRT))
+models <- models %>% mutate(DEG0.05=map(lrt, calcDEG))
 ```
 
+Save it.
 ```{r}
-results <- results %>%
-  mutate(n.DEG = map_int(DEG0.05, nrow))
+save(models, file="../output/TimeCourseDGE_LRT.Rdata")
 ```
 
+Now count the number of differnetially expressed genes for each time point.  Also, fix day_time and day for better plotting.
 ```{r}
-resultssmall <- results %>%
-  select(-dge, -lrt) %>%
+results <- models %>%
+  mutate(n.DEG = map_int(DEG0.05, nrow)) %>%
   mutate(day_time = str_replace(day_time, "^([1-9]-)", "0\\1"),
-         day=as.numeric(day))
-
-resultssmall %>% arrange(day_time)
+         day=as.numeric(day)) %>%
+  select(-dge, -lrt) %>%
+  arrange(day_time)
 ```
+
 plot it
 ```{r}
-resultssmall %>%
+results %>%
   ggplot(aes(x=time, y=n.DEG)) +
   geom_col() +
   facet_grid(day ~ .)
 ggsave("../output/time_course_DEGs.png", height=6, width=8)
 ```
+
 
 

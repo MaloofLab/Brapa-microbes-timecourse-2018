@@ -68,7 +68,8 @@ samples
 ```{r}
 samples <- left_join(samples, key) 
 samples <- samples %>%
-  mutate(group=str_c(genotype, soil_trt, sampling_day, sampling_time))
+  mutate(sampling_day=str_pad(sampling_day,width=2,side = "left",pad="0")) %>%
+  mutate(group=str_c(genotype, soil_trt, sampling_day, sampling_time,sep="-"))
 samples
 ```
 

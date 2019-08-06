@@ -1,0 +1,37 @@
+---
+title: "04_HeatMap"
+output: html_notebook
+---
+
+What is the relationship among genes DE at different points in the time course?  Make a heat map!
+
+```{r}
+library(tidyverse)
+library(gplots)
+library(edgeR)
+```
+
+```{r}
+load("../output/TimeCourseDGE_LRT.Rdata")
+```
+
+```{r}
+names(models)
+genes <- models %>% 
+  mutate(DEG0.05 = map(DEG0.05, ~ .$table),
+         DEG0.05 = map(DEG0.05, ~ rownames_to_column(., "transcript_ID"))) %>%
+  unnest(DEG0.05)
+genes
+```
+
+Load full DGE, will need this for plotting
+```{r}
+load("../output/timecourseDGE.Rdata")
+cpm <- cpmByGroup(dge)
+cpm[1:10,1:5]
+```
+
+```{r}
+cpm.subset <- cpm[unique(genes$transcript_ID),]
+```
+
