@@ -17,21 +17,61 @@ load("../output/TimeCourseDGE_LRT.Rdata")
 
 ```{r}
 names(models)
-genes <- models %>% 
-  mutate(DEG0.05 = map(DEG0.05, ~ .$table),
-         DEG0.05 = map(DEG0.05, ~ rownames_to_column(., "transcript_ID"))) %>%
-  unnest(DEG0.05)
-genes
+DEgenes <- models %>% 
+  mutate(toptags = map(lrt, ~ topTags(.,n=Inf)), #pull the DE gene info out of each model
+         toptags = map(toptags, ~ .$table), # get the table of DE info
+         toptags = map(toptags, ~ rownames_to_column(., "transcript_ID"))) %>%
+  unnest(toptags) %>%
+  group_by(transcript_ID) %>%
+  filter(min(FDR) < 0.05) # only keep genes where FDR < 0.05 in at least one comparison.
+DEgenes %>% arrange(transcript_ID, FDR) %>% select(day_time, transcript_ID, logFC, FDR)
 ```
 
-Load full DGE, will need this for plotting
+heat map of logFC
+
+make a matrix from DEgenes
 ```{r}
-load("../output/timecourseDGE.Rdata")
-cpm <- cpmByGroup(dge)
-cpm[1:10,1:5]
+DEgenes.mat.trunc <- DEgenes %>%
+  select(day_time, transcript_ID, logFC) %>%
+  mutate(logFC=ifelse(abs(logFC) > 4, sign(logFC)*4, logFC)) %>%
+  spread(key = day_time, value = logFC) %>%
+  as.data.frame() %>%
+  column_to_rownames("transcript_ID") %>%
+  as.matrix()
+DEgenes.mat.trunc[1:10,1:10]
 ```
 
+now, make the heat map
+
+```{r, fig.height=10, fig.width=10}
+DEgenes.mat.trunc %>% 
+  heatmap.2(Colv = FALSE,
+            keysize=1,
+            dendrogram="row",
+            sepwidth = c(0,0),
+            labRow = FALSE,
+            mar=c(12,0),
+            srtCol = 45,
+            col=colorRampPalette(c("green", "black", "magenta")),
+            trace = "none",
+            cexCol = 2
+            #breaks=c(-8,-5, -2, -.5, .5, 2.5, 5, 10)
+            )
+            
+```
+
+
+count number of samples that each gene is DE in, and summarize
+
 ```{r}
-cpm.subset <- cpm[unique(genes$transcript_ID),]
+DEgenes %>%
+  summarize(n.timepoints=sum(FDR<0.05)) %>%
+  group_by(n.timepoints) %>%
+  summarize(n.genes=n()) %>%
+  ggplot(aes(x=n.timepoints, y=n.genes)) +
+  geom_col() +
+  ggtitle("Number of genes detected at 1, 2, 3, ..., n time points") +
+  ylab("number of genes") +
+  xlab("number of time points")
 ```
 
