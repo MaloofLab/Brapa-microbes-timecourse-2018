@@ -75,3 +75,33 @@ DEgenes %>%
   xlab("number of time points")
 ```
 
+Compare to previous experiment
+```{r}
+exp1 <- read_csv("../../Brapa_microbes/v3.0annotation/20170617-samples/output/FULLtoptag/root.trt5E_live.DEGs.add.rB.rFPsc.NB.v3.0anno.csv")
+exp1
+```
+
+```{r}
+sum(exp1$FDR<0.05)
+```
+
+Now go through each timepoint and compare with this list...
+
+```{r}
+exp1genes <- exp1$genes[exp1$FDR < 0.05]
+
+overlap <- DEgenes %>% filter(FDR < 0.05) %>% 
+  group_by(day_time) %>%
+  summarize(total=n(), overlap=sum(transcript_ID %in% exp1genes), unique=total-overlap)
+overlap
+```
+
+```{r}
+overlap %>%
+  select(-total) %>%
+  gather(key="set", value="genes", -day_time) %>%
+  ggplot(aes(x=day_time, y=genes, fill=set)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle=90, hjust = 1, vjust=0.5))
+```
+
