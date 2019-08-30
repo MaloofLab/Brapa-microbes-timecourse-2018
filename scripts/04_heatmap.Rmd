@@ -60,6 +60,24 @@ DEgenes.mat.trunc %>%
             
 ```
 
+heat map that clusters samples also:
+
+```{r, fig.height=10, fig.width=10}
+DEgenes.mat.trunc %>% 
+  heatmap.2(keysize=1,
+            dendrogram="both",
+            sepwidth = c(0,0),
+            labRow = FALSE,
+            mar=c(12,0),
+            srtCol = 45,
+            col=colorRampPalette(c("green", "black", "magenta")),
+            trace = "none",
+            cexCol = 2
+            #breaks=c(-8,-5, -2, -.5, .5, 2.5, 5, 10)
+            )
+            
+```
+
 
 count number of samples that each gene is DE in, and summarize
 
