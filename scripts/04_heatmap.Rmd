@@ -184,6 +184,24 @@ exp13_timecourse_.1 %>%
 ```
 
 
+What about upsetr plot for DE genes anywhere in time course?
+
+```{r}
+exp13 %>% select(transcript_ID, e1.root.trt5E_live.DEGs.add.rD.rFPsc.FDR0.1, e3.root.trtlive.DEGs.add.rD.rCR.v3.0anno.FDR0.1) %>%
+  mutate(timecourse = as.numeric(transcript_ID %in% DEgenes_01table_FDR0.1$transcript_ID)) %>% 
+  as.data.frame() %>%
+  upset()
+```
+
+```{r}
+exp13 %>% select(transcript_ID, e1.root.trt5E_live.DEGs.add.rD.rFPsc.FDR0.05, e3.root.trtlive.DEGs.add.rD.rCR.v3.0anno.FDR0.05) %>%
+  mutate(timecourse = as.numeric(transcript_ID %in% DEgenes_01table_FDR0.05$transcript_ID)) %>% 
+  as.data.frame() %>%
+  upset()
+```
+
+
+
 ```{r}
 overlap %>%
   select(-total) %>%
