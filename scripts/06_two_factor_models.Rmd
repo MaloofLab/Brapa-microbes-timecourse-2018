@@ -72,34 +72,102 @@ twoafternoon.trtlive.DEGs <- topTags(twoafternoon.trtlive.lrt,n = Inf,p.value = 
 ```
 
 # diurnal data. One analysis for day 3+4 and a separate analysis for days 13+14 
+
+## Days 3 and 4
 ```{r}
 # subset data
-dge.diurnal<-dge[,dge$samples$sampling_day %in% c("13","14")]
-dge.diurnal$samples
+dge.diurnal34<-dge[,dge$samples$sampling_day %in% c("03","04")]
+dge.diurnal34$samples
 # reset normalization factor
-dge.diurnal$samples$norm.factors<-1 # # No matter which case, non-normalize libraries.
+dge.diurnal34$samples$norm.factors<-1 # # No matter which case, non-normalize libraries.
 # filtering
-dge.diurnal<-dge.diurnal[rowSums(cpm(dge.diurnal)>1) >=3,keep.lib.sizes=FALSE]
+dge.diurnal34<-dge.diurnal34[rowSums(cpm(dge.diurnal34)>1) >=3,keep.lib.sizes=FALSE]
 # relevel soil_trt to "SBC_OLD" 
-dge.diurnal$samples<-dge.diurnal$samples %>% mutate(soil_trt=fct_relevel(soil_trt,"ATM_BLANK")) # %>% str() 
+dge.diurnal34$samples<-dge.diurnal34$samples %>% mutate(soil_trt=fct_relevel(soil_trt,"ATM_BLANK")) # %>% str() 
 # relevel sampling_time to "1_morn"
-dge.diurnal$samples<-dge.diurnal$samples %>% mutate(sampling_time=fct_relevel(sampling_time,"1_morn")) # %>% str() 
+dge.diurnal34$samples<-dge.diurnal34$samples %>% mutate(sampling_time=fct_relevel(sampling_time,"1_morn")) # %>% str() 
 # model
-dge.diurnal.design <- with(dge.diurnal$samples, model.matrix(~ soil_trt + sampling_time + soil_trt:sampling_time + block))
-colnames(dge.diurnal.design)
+dge.diurnal34.design <- with(dge.diurnal34$samples, model.matrix(~ soil_trt + sampling_time + soil_trt:sampling_time + block))
+colnames(dge.diurnal34.design)
 # estimateDisp
-dge.diurnal <- estimateDisp(dge.diurnal,design = dge.diurnal.design)
+dge.diurnal34 <- estimateDisp(dge.diurnal34,design = dge.diurnal34.design)
 ## fit linear model
-dge.diurnal.fit <- glmFit(dge.diurnal,dge.diurnal.design)
+dge.diurnal34.fit <- glmFit(dge.diurnal34,dge.diurnal34.design)
 
 # get DEGs, interaction effects at any time points (under construction)
-dge.diurnal.anytime.lrt <- glmLRT(dge.diurnal.fit,coef = str_which(colnames(dge.diurnal.design),":")) ## all
-dge.diurnal.anytime.DEGs.all <- topTags(dge.diurnal.anytime.lrt,n = Inf,p.value = 1)$table
+dge.diurnal34.anytime.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),":")) ## all
+dge.diurnal34.anytime.DEGs.all <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-dge.diurnal.anytime.DEGs <- topTags(dge.diurnal.anytime.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal.anytime.DEGs) # 1???? something is wrong???
+dge.diurnal34.anytime.DEGs <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.anytime.DEGs) # 1???? something is wrong???
 ```
 
+Above asks for the interaction effects...what about trt on its own?
+```{r}
+# get DEGs, trt
+dge.diurnal34.trt.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"soil_trtSBC_OLD")) ## all
+dge.diurnal34.trt.DEGs.all <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+dge.diurnal34.trt.DEGs <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.trt.DEGs) # 
+```
 
+Above asks for the interaction effects...what about time on its own?
+
+```{r}
+# get DEGs, time
+dge.diurnal34.time.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"^sampling")) ## all
+dge.diurnal34.time.DEGs.all <- topTags(dge.diurnal34.time.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+dge.diurnal34.time.DEGs <- topTags(dge.diurnal34.time.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.time.DEGs) # 
+```
+
+## Days 13 and 14
+
+```{r}
+# subset data
+dge.diurnal1314<-dge[,dge$samples$sampling_day %in% c("13","14")]
+dge.diurnal1314$samples
+# reset normalization factor
+dge.diurnal1314$samples$norm.factors<-1 # # No matter which case, non-normalize libraries.
+# filtering
+dge.diurnal1314<-dge.diurnal1314[rowSums(cpm(dge.diurnal1314)>1) >=3,keep.lib.sizes=FALSE]
+# relevel soil_trt to "SBC_OLD" 
+dge.diurnal1314$samples<-dge.diurnal1314$samples %>% mutate(soil_trt=fct_relevel(soil_trt,"ATM_BLANK")) # %>% str() 
+# relevel sampling_time to "1_morn"
+dge.diurnal1314$samples<-dge.diurnal1314$samples %>% mutate(sampling_time=fct_relevel(sampling_time,"1_morn")) # %>% str() 
+# model
+dge.diurnal1314.design <- with(dge.diurnal1314$samples, model.matrix(~ soil_trt + sampling_time + soil_trt:sampling_time + block))
+colnames(dge.diurnal1314.design)
+# estimateDisp
+dge.diurnal1314 <- estimateDisp(dge.diurnal1314,design = dge.diurnal1314.design)
+## fit linear model
+dge.diurnal1314.fit <- glmFit(dge.diurnal1314,dge.diurnal1314.design)
+
+# get DEGs, interaction effects at any time points (under construction)
+dge.diurnal1314.anytime.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),":")) ## all
+dge.diurnal1314.anytime.DEGs.all <- topTags(dge.diurnal1314.anytime.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+dge.diurnal1314.anytime.DEGs <- topTags(dge.diurnal1314.anytime.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.anytime.DEGs) # 1???? something is wrong???
+
+```
+
+Above asks for the interaction effects...what about trt on its own?
+```{r}
+# get DEGs, trt
+dge.diurnal1314.trt.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),"soil_trtSBC_OLD")) ## all
+dge.diurnal1314.trt.DEGs.all <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+dge.diurnal1314.trt.DEGs <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.trt.DEGs) # 
+```
+
+Above asks for the interaction effects...what about time on its own?
+
+```{r}
+# get DEGs, time
+dge.diurnal1314.time.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),"^sampling")) ## all
+dge.diurnal1314.time.DEGs.all <- topTags(dge.diurnal1314.time.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+dge.diurnal1314.time.DEGs <- topTags(dge.diurnal1314.time.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.time.DEGs) # 
+```
 
 
 
