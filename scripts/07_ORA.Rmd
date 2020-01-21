@@ -1,0 +1,118 @@
+---
+title: "07_ORA"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE,error=TRUE)
+#library(d3heatmap)
+library(flexdashboard)
+library(edgeR);library(tidyverse)
+library(readr);library(readxl)
+library(stringr)
+
+```
+
+# load Brgo.v3.0anno.Atgoslim.BP.list
+```{r eval=TRUE,error=TRUE}
+load(file.path("..","Annotation_copy","output","v3.0annotation","Brgo.v3.0anno.Atgoslim.BP.list.Rdata"))
+```
+# load GO.ORA function
+# GOseq function for Brassica rapa (v3.0)
+```{r eval=TRUE,error=TRUE}
+# GOseq
+library(ShortRead);library(goseq);library(GO.db);library("annotate")
+# for ggplot heatmap
+## uncompress gz file
+system(paste("gunzip -c ",file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.gz")," > ",file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.fa")))
+## read cDNA fasta file 
+Bra.v3.0_cdna<-readDNAStringSet(file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.fa")) # copied from /Volumes/data_work/Data8/NGS_related/Brassica_rapa_Upendra/G3
+Bra.v3.0_cdna
+## remove fasta file
+system(paste("rm ",file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.fa"),sep=""))
+# GOseq function
+GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA<-function(genelist,padjust=0.05,ontology="BP",custom.category.list=Brgo.v3.0anno.Atgoslim.BP.list,Br_cdna=Bra.v3.0_cdna) { # return GO enrichment table, padjus, padjust=0.05. 
+  
+  bias<-nchar(Br_cdna)
+  names(bias)<-names(Br_cdna)
+  TF<-(names(bias) %in% genelist)*1
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  #GO.pval <- goseq(pwf,gene2cat=Brgo.DF3,use_genes_without_cat=TRUE) # format became different in new goseq version (021111)
+  
+  #head(GO.pval) 
+  if(ontology=="BP") {
+    GO.pval2<-subset(GO.pval,ontology=="BP")
+  } else if(ontology=="CC") {
+    GO.pval2<-subset(GO.pval,ontology=="CC")
+  } else {
+    GO.pval2<-subset(GO.pval,ontology=="MF")
+  }
+    
+  GO.pval2$over_represented_padjust<-p.adjust(GO.pval2$over_represented_pvalue,method="BH")
+  if(GO.pval2$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval2[GO.pval2$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    
+    ## write Term and Definition 
+    for(i in 1:dim(enriched.GO)[1]) {
+      if(is.null(Term(GOTERM[enriched.GO[i,"category"]]))) {next} else {
+      enriched.GO$Term[i]<-Term(GOTERM[[enriched.GO[i,"category"]]])
+      enriched.GO$Definition[i]<-Definition(GOTERM[[enriched.GO[i,"category"]]])
+      }
+    }
+    return(enriched.GO)
+  }
+}
+#
+head(Bra.v3.0_cdna)
+# length(bias) # 44239 > 45019 where the bias come from?
+#  bias.data vector must have the same length as DEgenes vector!
+```
+
+# ORA: two afternoon
+```{r}
+twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.trtlive.DEGs.all.v3.0anno.csv"))
+
+#  for(file in names(DEG.count.list.e1.v3.0annotation)) {
+    
+  library(dplyr)
+  #genelist.up<-base::get(paste("../output/",DEG.objs.v3.0annotation.unique[n],sep="")) %>% rownames_to_column() %>%  dplyr::filter(logFC>0) # does not work
+    # DEG.count.list.e1.v3.0annotation[[file]]
+    temp<-twoafternoon.trtlive.DEGs.all.v3.0anno
+    genelist.up<-temp[temp[,3]>0&temp[,"FDR"]<0.05,"genes"];genelist.down<-temp[temp[,3]<0&temp[,"FDR"]<0.05,"genes"]
+   print(paste("number of up genes is ",dim(genelist.up)[1]))
+    #genelist.down<-read_csv(paste("../output/",file,sep=""))  %>%  dplyr::filter(logFC.genotypeR500<0)
+   if(dim(genelist.up)[1]<3) {print("Number of up genes is smaller than three. Skip this."); GO.ORA.temp.up<-"no enriched GO";next} else {GO.ORA.temp.up<-GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(as_vector(genelist.up)) }
+      print(paste("number of down genes is ",dim(genelist.down)[1]))
+   if(dim(genelist.down)[1]<3) {print("Number of up genes is smaller than three. Skip this."); GO.ORA.temp.down<-"no enriched GO"; next} else {GO.ORA.temp.down<-GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(as_vector(genelist.down)) }
+    # handling "no enriched GO" 
+    # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
+    x<-list(GO.ORA.temp.up=GO.ORA.temp.up,
+            GO.ORA.temp.down=GO.ORA.temp.down) # list
+    x<-x[!x=="no enriched GO"] # remove "no enriched GO" result
+    ## add sample info and FC info and save GO.ORA result
+        if(length(x)==0) {next} else {
+          for (i in 1:length(x)) {
+           GO.ORA.result<-x[[i]] }
+GO.ORA.result      
+# save data           
+save(GO.ORA.result,file="../output/GOseq.timecourse.twoafternoon.Brgo.v3.0.Atgoslim.BP.list.enrich.Rdata")
+          }
+
+```
+
+
+# session info
+```{r}
+sessionInfo
+```
+
