@@ -70,11 +70,11 @@ gene_compare
 
 ```{r}
 gene_compare <- gene_compare %>%
-  mutate(cortest = map(data, ~ cor.test(.$logFC.microbe, .$logFC.Fe, method="kendall")))
+  mutate(cortest = map(data, ~ cor.test(.$logFC.microbe, .$logFC.Fe, method="spearman", exact=FALSE)))
 ```
 
 ```{r}
 gene_compare %>% mutate(glance = map(cortest, broom::glance)) %>% unnest(glance) %>%
-  arrange(p.value)
+  arrange(p.value) %>% select(day_time, estimate, p.value) 
 ```
 
