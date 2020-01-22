@@ -83,7 +83,6 @@ head(Bra.v3.0_cdna)
 twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.trtlive.DEGs.all.v3.0anno.csv"))
 
 #  for(file in names(DEG.count.list.e1.v3.0annotation)) {
-    
   library(dplyr)
   #genelist.up<-base::get(paste("../output/",DEG.objs.v3.0annotation.unique[n],sep="")) %>% rownames_to_column() %>%  dplyr::filter(logFC>0) # does not work
     # DEG.count.list.e1.v3.0annotation[[file]]

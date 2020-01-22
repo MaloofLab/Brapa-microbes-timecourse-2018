@@ -119,14 +119,36 @@ dge.twoafternoon.design <- with(dge.twoafternoon$samples, model.matrix(~ soil_tr
 dge.twoafternoon <- estimateDisp(dge.twoafternoon,design = dge.twoafternoon.design)
 ## fit linear model
 dge.twoafternoon.fit<- glmFit(dge.twoafternoon,dge.twoafternoon.design)
+```
+
 # get DEGs, soil_trt effects (coef=c("SBC_OLD"))
+```{r}
 twoafternoon.trtlive.lrt <- glmLRT(dge.twoafternoon.fit,coef = c("soil_trtSBC_OLD"))
 ## all
 twoafternoon.trtlive.DEGs.all <- topTags(twoafternoon.trtlive.lrt,n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-twoafternoon.trtlive.DEGs <- topTags(twoafternoon.trtlive.lrt,n = Inf,p.value = 0.05)$table;nrow(twoafternoon.trtlive.DEGs) # 1474
-
+twoafternoon.trtlive.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 1474
 ```
+
+# get DEGs, any soil_trt effects interactions
+```{r}
+twoafternoon.any.trtlive.samplingday.lrt <- glmLRT(dge.twoafternoon.fit,coef = str_which(colnames(dge.twoafternoon.design),"soil_trtSBC_OLD:"))
+## all
+twoafternoon.any.trtlive.samplingday.lrt.DEGs.all <- topTags(twoafternoon.any.trtlive.samplingday.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+twoafternoon.any.trtlive.samplingday.lrt.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 310
+```
+
+# get DEGs, any soil_trt effects combined 
+```{r}
+twoafternoon.any.trtlive.lrt <- glmLRT(dge.twoafternoon.fit,coef = str_which(colnames(dge.twoafternoon.design),"soil_trtSBC_OLD"))
+## all
+twoafternoon.any.trtlive.DEGs.all <- topTags(twoafternoon.any.trtlive.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+twoafternoon.any.trtlive.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 2249
+```
+
+
 
 # diurnal data. One analysis for day 3+4 and a separate analysis for days 13+14 
 
@@ -229,6 +251,7 @@ dge.diurnal1314.time.DEGs <- topTags(dge.diurnal1314.time.lrt,n = Inf,p.value = 
 
 
 # Adding annotation 
+## prep
 ```{r}
 # annotation file for v3.0annotation
 Br.v3.0.At.BLAST <- read_csv(file.path("..","Annotation_copy","output","v3.0annotation","Brapa_v3.0_annotated.csv")) 
@@ -236,13 +259,25 @@ Br.v3.0.At.BLAST <- read_csv(file.path("..","Annotation_copy","output","v3.0anno
 Br.v3.0.At.BLAST %>% filter(name=="BraA01g040570.3C")
 # reduce the redundancy (112418)
 Br.v3.0anno.At.BLAST.highscore <- Br.v3.0.At.BLAST %>% group_by(name) %>% arrange(desc(score)) %>% dplyr::slice(1)
+# function for adding annotation
+## get object name https://stackoverflow.com/questions/14577412/how-to-convert-variable-object-name-into-string
+myfunc <- function(v1) {
+  deparse(substitute(v1))
+}
+myfunc(foo)
+# adding annotation and write_csv adding ".v3.0anno.csv" to the object name.
+addAnno<-function(DGE) {temp<-left_join(DGE %>% rownames_to_column(var="genes"),Br.v3.0anno.At.BLAST.highscore,by=c(genes="name")) %>%  dplyr::select(genes,names(DGE),AGI, At_symbol, At_short_description, perc_ID); print(deparse(substitute(DGE)));
+write_csv(temp, path=file.path("..","output",paste(deparse(substitute(DGE)),".v3.0anno.csv",sep="")));
+return(temp)} 
+```
 
-# add annotiona with full name objects (all)
-twoafternoon.trtlive.DEGs.all.v3.0anno <- left_join(twoafternoon.trtlive.DEGs.all %>% rownames_to_column(var="genes"),Br.v3.0anno.At.BLAST.highscore,by=c(genes="name")) %>%  dplyr::select(1:6, AGI, At_symbol, At_short_description, perc_ID)
-twoafternoon.trtlive.DEGs.all.v3.0anno
-# write csv (all)
-## trt
-write.csv(twoafternoon.trtlive.DEGs.all.v3.0anno,file=file.path("..","output","twoafternoon.trtlive.DEGs.all.v3.0anno.csv"))
+## add annotiona with full name objects (all) and write it in csv (stored in "output" directory)
+```{r}
+# 
+twoafternoon.trtlive.DEGs.all.v3.0anno <- addAnno(twoafternoon.trtlive.DEGs.all)
+twoafternoon.any.trtlive.samplingday.lrt.DEGs.all.v3.0anno <- addAnno(twoafternoon.any.trtlive.samplingday.lrt.DEGs.all)
+twoafternoon.any.trtlive.DEGs.all.v3.0anno <- addAnno(twoafternoon.any.trtlive.DEGs.all)
+
 ```
 
 # Session info
