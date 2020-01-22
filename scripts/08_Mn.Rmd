@@ -1,0 +1,144 @@
+---
+title: "08_Mm_responsive_genes"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+#library(knitr)
+knitr::opts_chunk$set(echo = TRUE,error=TRUE)
+#library(d3heatmap)
+#library(flexdashboard)
+library(edgeR);library(tidyverse)
+library(readr);library(readxl)
+library(stringr)
+
+```
+
+# mapping read files by Kalisto
+
+# working in directories containing fastq files (working in Whitney/NGS/Arabidopsis_analysis_3/Ro)
+```{r}
+fastqfiles<-list.files(pattern="fastq")
+system(paste("fastqc ",fastqfiles,sep=""))
+```
+
+Build index
+```{r}
+system("kallisto index -i TAIR10_cdna_20110103_representative_gene_model_kallisto_index TAIR10_cdna_20110103_representative_gene_model.gz")
+# This reference seq has been updated in 2012! Redo mapping (101018)
+system("kallisto index -i TAIR10_cdna_20110103_representative_gene_model_updated_kallisto_index TAIR10_cdna_20110103_representative_gene_model_updated")
+```
+mapping
+```{r}
+# working in fastq file directory
+# making directory for mapped 
+system("mkdir ../kallisto_sam_out2")
+# go to fastq file directory
+# reading fastq files (in fastq file directory)
+#fastqfiles<-list.files(pattern="fastq.gz")
+# fastq files with single end 
+# fastqfiles.SE<- fastqfiles %>% as_tibble() %>% separate(value,into=c("SRA","type","compress"),sep="\\.") %>% separate(SRA,into=c("SRA","pair"),sep="_") %>% group_by(SRA) %>%summarize(num=n()) %>% filter(num==1) %>% select(SRA) %>% as_vector()
+for(x in fastqfiles) {
+system(paste("kallisto quant -i ../references/TAIR10_cdna_20110103_representative_gene_model_updated_kallisto_index  -o ../kallisto_sam_out2/",x," --single -l 250 -s 40 --pseudobam ",x," | samtools view -Sb - > ../kallisto_sam_out2/",x,"/",x,".bam",sep=""))
+setwd(paste("../kallisto_sam_out2/",x,sep=""))
+system(paste("samtools sort *.bam -o ",x,".sorted.bam",sep=""))
+system("samtools index *.sorted.bam")
+setwd("../../Rodriguez-Celma_2016_RNAseq")
+}
+```
+
+Normalize reads and create DGE objects
+
+```{r}
+library(tidyverse)
+library(edgeR)
+```
+
+# copy kallisto_sam_out2 directory in Whitney under input directory
+## get reads and create data frame
+
+```{r}
+files <- dir("../input/kallisto_sam_out2/", include.dirs = TRUE)
+files %>% head()
+```
+
+```{r}
+counts.list <- map(files, ~ read_tsv(
+  file=file.path("..","input","kallisto_sam_out2",.,"abundance.tsv"),
+  col_types = "cdddd"))
+names(counts.list) <- files
+```
+
+```{r}
+counts <- sapply(counts.list, select, est_counts) %>% 
+  bind_cols(counts.list[[1]][,"target_id"],.)
+counts[is.na(counts)] <- 0
+colnames(counts) <- sub(".fastq.gz.est_counts","",colnames(counts),fixed = TRUE)
+counts
+```
+
+```{r}
+write_csv(counts,"../output/2016-Rodriguez-Celma_2016_raw_counts.csv.gz")
+```
+
+```{r}
+counts2 <- counts %>% 
+  as.data.frame() %>% 
+  column_to_rownames(var = "target_id") %>%
+  as.matrix() %>%
+  round(0)
+```
+# dge (under construction)
+```{r}
+dge <- DGEList(counts=counts2, 
+               samples=colnames(counts2), 
+               group=factor(rep(c("minusMn","ES"),each=3),levels=c("ES","minusMn"))
+                                )
+```
+
+# normalize
+
+```{r}
+dge <- calcNormFactors(dge)
+```
+# save
+```{r}
+save(dge, file="../output/Rodriguez-Celma_2016.Rdata")
+```
+# DEG
+```{r}
+group<-factor(rep(c("minusMn","ES"),each=3),levels=c("ES","minusMn"))
+design <- model.matrix(~group)
+y <- estimateDisp(dge,design)
+fit <- glmFit(y,design)
+lrt <- glmLRT(fit,coef=2)
+Mn_deficiency.DEGs.all<-topTags(lrt,n = Inf,p.value = 1)$table
+
+```
+# Adding annotation 
+```{r}
+#At.gene.name <-read_tsv("https://www.arabidopsis.org/download_files/Subscriber_Data_Releases/TAIR_Data_20180630/gene_aliases_20180702.txt.gz") # Does work from home when I use Pulse Secure.
+# At.gene.name <- 
+#read_tsv("https://www.arabidopsis.org/download_files/Public_Data_Releases/TAIR_Data_20181231/Araport11_functional_descriptions_20181231.txt.gz") # does not exist anymore
+# updated one (Jan 21, 2020)
+#At.gene.name<-read_tsv("https://www.arabidopsis.org/download_files/Subscriber_Data_Releases/TAIR_Data_20191231/gene_aliases_20191231.txt.gz") # download file and remove all "" with TextWrangler etc
+At.gene.name<-read_tsv(file.path("..","Annotation_copy","input","gene_aliases_20191231.txt")) 
+# combine redundant symbol
+At.gene.name <- At.gene.name %>% group_by(name) %>% summarise(symbol2=paste(symbol,collapse=";"),full_name=paste(full_name,collapse=";"))
+At.gene.name %>% dplyr::slice(100:110)
+At.gene.name %>% filter(name=="AT4G25350") # SHB1
+# add annotiona with full name objects (all)
+Mn_deficiency.DEGs.all.anno <- Mn_deficiency.DEGs.all %>% rownames_to_column(var="genes") %>% separate(genes,into=c("AGI","variant"),sep="\\.", remove=FALSE) %>% left_join(At.gene.name,by=c(AGI="name")) %>%  dplyr::select(AGI, logFC,logCPM,LR,PValue,FDR,symbol2, full_name)
+Mn_deficiency.DEGs.all.anno %>% dplyr::slice(1:100) # %>% View()
+# write csv (all)
+write.csv(Mn_deficiency.DEGs.all.anno,file=file.path("..","output","Mn_deficiency.DEGs.all.anno.csv"))
+```
+
+# Session info
+```{r}
+sessionInfo()
+```

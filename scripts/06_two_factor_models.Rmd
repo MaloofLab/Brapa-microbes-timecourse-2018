@@ -3,13 +3,15 @@ title: "Two factor models"
 output:
   html_document:
     df_print: paged
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
-library(knitr)
+#library(knitr)
 knitr::opts_chunk$set(echo = TRUE,error=TRUE)
 #library(d3heatmap)
-library(flexdashboard)
+#library(flexdashboard)
 library(edgeR);library(tidyverse)
 library(readr);library(readxl)
 library(stringr)
@@ -45,6 +47,61 @@ models <- models %>%
 
 models %>% select(-dge) #%>% View()
 ```
+
+# MDS plot bcv (under construction)
+```{r}
+# MDS plot
+mds <- plotMDS(dge,method = "bcv",labels=dge$samples$group,gene.selection = "pairwise",dim.plot = c(1,2),ndim=5)
+# sample tibble
+samples.tibble<-dge$samples %>% as_tibble() %>% bind_cols(data.frame(sample=row.names(dge$samples)),.)
+# MDS plot data                                   
+mds.pl <- as_tibble(mds$cmdscale.out) %>% 
+  bind_cols(data.frame(sample=row.names(mds$cmdscale.out)),.) %>%
+  inner_join(samples.tibble,by="sample")
+# ggplot2 version
+p.bcv<-mds.pl %>% ggplot(aes(x=V1,y=V2, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("timecourse Samples DIM 1 vs 2 bcv")+ facet_grid(sampling_time~sampling_day) + theme_gray()
+ggsave(p,filename="../output/timecourse.mds.bcv.1and2.png",width=12,height=8)
+
+mds.pl %>% ggplot(aes(x=V1,y=V2, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("Samples DIM 1 vs 2 bcv")+ facet_grid(.~block)
+mds.pl %>% ggplot(aes(x=V2,y=V3, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("Samples DIM 2 vs 3 bcv")+ facet_grid(.~block)
+mds.pl %>% ggplot(aes(x=V3,y=V4, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("Samples DIM 3 vs 4 bcv")+ facet_grid(.~block)
+# no large block effects
+
+
+```
+
+
+# MDS plot logFC (under construction)
+```{r}
+# MDS plot
+mds.logFC <- plotMDS(dge,method = "logFC",labels=dge$samples$group,gene.selection = "pairwise",dim.plot = c(1,2),ndim=5)
+# sample tibble
+samples.tibble<-dge$samples %>% as_tibble() %>% bind_cols(data.frame(sample=row.names(dge$samples)),.)
+# MDS plot data                                   
+mds.logFC.pl <- as_tibble(mds.logFC$cmdscale.out) %>% 
+  bind_cols(data.frame(sample=row.names(mds$cmdscale.out)),.) %>%
+  inner_join(samples.tibble,by="sample")
+# ggplot2 version
+p.logFC<-mds.logFC.pl %>% ggplot(aes(x=V1,y=V2, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("timecourse Samples DIM 1 vs 2 logFC")+ facet_grid(sampling_time~sampling_day) + theme_gray()
+ggsave(p.logFC,filename="../output/timecourse.mds.logFC.1and2.png",width=12,height=8)
+# V2, V2
+mds.logFC.pl %>% ggplot(aes(x=V2,y=V3, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("timecourse Samples DIM 1 vs 2 logFC")+ facet_grid(sampling_time~sampling_day) + theme_gray()
+ggsave(filename="../output/timecourse.mds.logFC.2and3.png",width=12,height=8)
+
+# V3, V4
+mds.logFC.pl %>% ggplot(aes(x=V3,y=V4, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("timecourse Samples DIM 1 vs 2 logFC")+ facet_grid(sampling_time~sampling_day) + theme_gray()
+ggsave(filename="../output/timecourse.mds.logFC.3and4.png",width=12,height=8)
+
+
+mds.logFC.pl %>% ggplot(aes(x=V1,y=V2, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("Samples DIM 1 vs 2 bcv")+ facet_grid(.~block)
+mds.logFC.pl %>% ggplot(aes(x=V2,y=V3, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("Samples DIM 2 vs 3 bcv")+ facet_grid(.~block)
+mds.logFC.pl %>% ggplot(aes(x=V3,y=V4, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("Samples DIM 3 vs 4 bcv")+ facet_grid(.~block)
+# no large block effects
+
+
+```
+
+
 
 # "2-afternoon" data. y ~ trt + day + trt:day
 ```{r}
