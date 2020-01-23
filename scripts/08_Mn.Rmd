@@ -21,19 +21,19 @@ library(stringr)
 # mapping read files by Kalisto
 
 # working in directories containing fastq files (working in Whitney/NGS/Arabidopsis_analysis_3/Ro)
-```{r}
+```{r eval=FALSE}
 fastqfiles<-list.files(pattern="fastq")
 system(paste("fastqc ",fastqfiles,sep=""))
 ```
 
 Build index
-```{r}
+```{r eval=FALSE}
 system("kallisto index -i TAIR10_cdna_20110103_representative_gene_model_kallisto_index TAIR10_cdna_20110103_representative_gene_model.gz")
 # This reference seq has been updated in 2012! Redo mapping (101018)
 system("kallisto index -i TAIR10_cdna_20110103_representative_gene_model_updated_kallisto_index TAIR10_cdna_20110103_representative_gene_model_updated")
 ```
 mapping
-```{r}
+```{r eval=FALSE}
 # working in fastq file directory
 # making directory for mapped 
 system("mkdir ../kallisto_sam_out2")
@@ -74,19 +74,19 @@ names(counts.list) <- files
 ```
 
 ```{r}
-counts <- sapply(counts.list, select, est_counts) %>% 
+counts.RodriguezCelma2016 <- sapply(counts.list, dplyr::select, est_counts) %>% 
   bind_cols(counts.list[[1]][,"target_id"],.)
-counts[is.na(counts)] <- 0
-colnames(counts) <- sub(".fastq.gz.est_counts","",colnames(counts),fixed = TRUE)
-counts
+counts.RodriguezCelma2016[is.na(counts.RodriguezCelma2016)] <- 0
+colnames(counts.RodriguezCelma2016) <- sub(".fastq.gz.est_counts","",colnames(counts.RodriguezCelma2016),fixed = TRUE)
+counts.RodriguezCelma2016
 ```
 
 ```{r}
-write_csv(counts,"../output/2016-Rodriguez-Celma_2016_raw_counts.csv.gz")
+write_csv(counts.RodriguezCelma2016,"../output/2016-Rodriguez-Celma_2016_raw_counts.csv.gz")
 ```
 
 ```{r}
-counts2 <- counts %>% 
+counts2 <- counts.RodriguezCelma2016 %>% 
   as.data.frame() %>% 
   column_to_rownames(var = "target_id") %>%
   as.matrix() %>%
@@ -137,6 +137,45 @@ Mn_deficiency.DEGs.all.anno %>% dplyr::slice(1:100) # %>% View()
 # write csv (all)
 write.csv(Mn_deficiency.DEGs.all.anno,file=file.path("..","output","Mn_deficiency.DEGs.all.anno.csv"))
 ```
+
+# Expression pattern
+```{r}
+load("../output/Rodriguez-Celma_2016.Rdata") # this is wrong
+
+Mn.RodriguezCelma_2016.cpm<-cpm(dge) %>% as_tibble() %>% bind_cols(data.frame(transcript_ID=rownames(dge$counts)),.) %>% separate(transcript_ID,into=c("AGI","variant"),remove=FALSE)
+sample.description.Mn.RodriguezCelma.2016<-dge$samples %>% as_tibble() %>% dplyr::rename(sample=samples)
+
+expression.pattern.AT.graph.cpm<-function(data=Mn.RodriguezCelma_2016.cpm,target.genes.FDR,sample.description=sample.description.Mn.RodriguezCelma.2016,title=""){
+  data[is.na(data)] <- 0 #
+  # using FDR
+  data.temp<-data  %>% 
+    dplyr::rename(target_id=AGI) %>%
+    filter(target_id %in% target.genes.FDR$AGI) %>% dplyr::select(-transcript_ID,-variant) %>%
+    gather(sample,value,-target_id) %>%
+    inner_join(sample.description, by="sample")  %>%
+    right_join(target.genes.FDR[,c("AGI","FDR")], by=c("target_id"="AGI")) %>%
+    mutate(FDR=format(FDR,digits=2,scientific=TRUE)) %>%
+    unite(target_id.FDR,target_id,FDR,sep="\n FDR ") 
+  # print(data.temp)
+    p<-data.temp %>% ggplot(aes(x=group,y=value))  + 
+      geom_jitter(alpha = 0.5,aes(color=group))  + 
+      theme_bw() + facet_grid(target_id.FDR~.,scales="free") +
+      theme(strip.text.y=element_text(angle=0),axis.text.x=element_text(angle=90)) +
+      theme(legend.position="bottom") + labs(title="")
+    p
+}
+# expression pattern of upregulated genes upon Mn deficienty
+   gene.of.interest.FDR.up <- Mn_deficiency.DEGs.all.anno %>% filter(FDR< 0.05,logFC>0) %>%
+     dplyr::select(AGI,logFC,FDR) %>% arrange(FDR)
+   print("logFC>0")
+expression.pattern.AT.graph.cpm(target.genes.FDR=gene.of.interest.FDR.up[1:5,])
+# down-regulated genes upon Mn deficienty
+   print("logFC<0")
+gene.of.interest.FDR.down <- Mn_deficiency.DEGs.all.anno %>% filter(FDR< 0.05,logFC<0) %>%
+     dplyr::select(AGI,logFC,FDR) %>% arrange(FDR)
+expression.pattern.AT.graph.cpm(target.genes.FDR=gene.of.interest.FDR.down[1:5,])
+```
+
 
 # Session info
 ```{r}
