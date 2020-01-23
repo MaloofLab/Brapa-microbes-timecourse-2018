@@ -1,5 +1,5 @@
 ---
-title: "Two factor models"
+title: "06 Two factor models"
 output:
   html_document:
     df_print: paged

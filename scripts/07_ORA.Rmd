@@ -3,6 +3,8 @@ title: "07_ORA"
 output:
   html_document:
     df_print: paged
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -13,7 +15,8 @@ library(flexdashboard)
 library(edgeR);library(tidyverse)
 library(readr);library(readxl)
 library(stringr)
-
+# read functions for expression graph
+source("../tools_copy/Expression_pattern_graph.R")
 ```
 
 # load Brgo.v3.0anno.Atgoslim.BP.list
@@ -78,17 +81,33 @@ head(Bra.v3.0_cdna)
 #  bias.data vector must have the same length as DEgenes vector!
 ```
 
-# ORA: two afternoon
+# ORA: two afternoon and expression pattern
 ```{r}
 twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.trtlive.DEGs.all.v3.0anno.csv"))
 
-#  for(file in names(DEG.count.list.e1.v3.0annotation)) {
   library(dplyr)
   #genelist.up<-base::get(paste("../output/",DEG.objs.v3.0annotation.unique[n],sep="")) %>% rownames_to_column() %>%  dplyr::filter(logFC>0) # does not work
-    # DEG.count.list.e1.v3.0annotation[[file]]
     temp<-twoafternoon.trtlive.DEGs.all.v3.0anno
     genelist.up<-temp[temp[,3]>0&temp[,"FDR"]<0.05,"genes"];genelist.down<-temp[temp[,3]<0&temp[,"FDR"]<0.05,"genes"]
    print(paste("number of up genes is ",dim(genelist.up)[1]))
+  # expression pattern of upregulated genes
+   gene.of.interest.FDR.up <- twoafternoon.trtlive.DEGs.all.v3.0anno %>% filter(FDR< 0.05,logFC>0) %>%
+     dplyr::select(genes,logFC,FDR) %>% arrange(FDR)
+   print("logFC>0")
+   p.up1<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.up[1,]);p.up1
+   p.up2<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.up[2,]);p.up2
+   p.up3<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.up[3,]);p.up3
+   p.up4<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.up[4,]);p.up4
+   p.up5<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.up[5,]);p.up5
+  # expression pattern of diwbregulated genes
+   gene.of.interest.FDR.down <- twoafternoon.trtlive.DEGs.all.v3.0anno %>% filter(FDR< 0.05,logFC<0) %>% dplyr::select(genes,logFC,FDR) %>% arrange(FDR)
+   print("logFC<0")
+   p.down1<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.down[1,]);p.down1
+   p.down2<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.down[2,]);p.down2
+   p.down3<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.down[3,]);p.down3
+   p.down4<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.down[4,]);p.down4
+   p.down5<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR.down[5,]);p.down5
+   
     #genelist.down<-read_csv(paste("../output/",file,sep=""))  %>%  dplyr::filter(logFC.genotypeR500<0)
    if(dim(genelist.up)[1]<3) {print("Number of up genes is smaller than three. Skip this."); GO.ORA.temp.up<-"no enriched GO";next} else {GO.ORA.temp.up<-GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(as_vector(genelist.up)) }
       print(paste("number of down genes is ",dim(genelist.down)[1]))
@@ -99,15 +118,13 @@ twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","t
             GO.ORA.temp.down=GO.ORA.temp.down) # list
     x<-x[!x=="no enriched GO"] # remove "no enriched GO" result
     ## add sample info and FC info and save GO.ORA result
-        if(length(x)==0) {next} else {
-          for (i in 1:length(x)) {
-           GO.ORA.result<-x[[i]] }
+        if(length(x)==0) {next} else {GO.ORA.result<-x}
 GO.ORA.result      
 # save data           
 save(GO.ORA.result,file="../output/GOseq.timecourse.twoafternoon.Brgo.v3.0.Atgoslim.BP.list.enrich.Rdata")
-          }
 
 ```
+
 
 
 # session info
