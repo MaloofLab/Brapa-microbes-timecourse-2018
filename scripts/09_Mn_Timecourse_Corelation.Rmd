@@ -1,0 +1,90 @@
+---
+title: "Mn Analysis"
+output: html_notebook
+---
+
+Check correlation between Mn responsive and microbe responsive genes in ime course
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(edgeR)
+```
+
+get the Mn data
+```{r}
+Mn <- read_csv("../output/Mn_deficiency.DEGs.all.anno.csv") %>%
+  select(AGI, logFC, FDR) %>%
+  filter(FDR < 0.05)
+Mn
+```
+
+Now get the microbe response data
+```{r}
+load("../output/TimeCourseDGE_LRT.Rdata")
+```
+
+```{r}
+names(models)
+DEgenes <- models %>% 
+  mutate(toptags = map(lrt, ~ topTags(.,n=Inf)), #pull the DE gene info out of each model
+         toptags = map(toptags, ~ .$table), # get the table of DE info
+         toptags = map(toptags, ~ rownames_to_column(., "transcript_ID"))) %>%
+  unnest(toptags) %>%
+  group_by(transcript_ID) %>%
+  arrange(transcript_ID, FDR) %>% 
+  select(day_time, transcript_ID, logFC, FDR)
+DEgenes
+```
+
+Add Arabidopdis ID to each Brassica gene
+
+First, get annotation
+```{r}
+annotation <- read_csv("../../Brapa_microbes/Annotation/output/v3.0annotation/Brapa_V3.0_annotated.csv")
+annotation
+```
+
+now join the annotation
+```{r}
+DEgenes <- annotation %>%
+  select(name, AGI) %>%
+  right_join(DEgenes, by=c("name" = "transcript_ID"))
+DEgenes
+```
+
+now add in the microbe data
+
+```{r}
+gene_compare <- DEgenes %>%
+  inner_join(Mn, by = c("AGI"), suffix = c(".microbe", ".Mn"))
+gene_compare
+```
+
+```{r}
+gene_compare <- gene_compare %>%
+  group_by(day_time) %>%
+  nest()
+gene_compare
+```
+
+```{r}
+gene_compare <- gene_compare %>%
+  mutate(cortest = map(data, ~ cor.test(.$logFC.microbe, .$logFC.Mn, method="spearman", exact=FALSE)))
+```
+
+```{r}
+gene_compare %>% mutate(glance = map(cortest, broom::glance)) %>% unnest(glance) %>%
+  arrange(p.value) %>% select(day_time, estimate, p.value) 
+```
+
+Plot the most significant one
+
+```{r}
+gene_compare %>%
+  filter(day_time=="02-2_afternoon") %>%
+  unnest(data) %>%
+  ggplot(aes(x=logFC.Mn, y=logFC.microbe)) +
+  geom_point(alpha=.2)
+```
+
