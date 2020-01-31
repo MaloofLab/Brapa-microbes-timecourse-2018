@@ -1,0 +1,504 @@
+---
+title: "09_clustering"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+```{r}
+
+```
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE,error=TRUE)
+#library(d3heatmap)
+library(edgeR);library(tidyverse)
+library(readr);library(readxl)
+library(stringr)
+# read functions for expression graph
+source("../tools_copy/Expression_pattern_graph.R")
+# filtering for selecting only expressed genes
+cpm.timecourse.v3.0<-cpm.timecourse.v3.0[rowSums(cpm.timecourse.v3.0[,-1]>1) >=28,] # 10% of libraries have
+dim(cpm.timecourse.v3.0) # [1] 27308   289
+# log transformed data
+cpm.timecourse.v3.0.log.summary<-hist(cpm.timecourse.v3.0.log %>% gather(sample,value,-1) %>% dplyr::select(value) %>% as_vector()) # OK. log transformed
+cpm.timecourse.v3.0.log.summary<-hist(cpm.timecourse.v3.0.log %>% filter(transcript_ID %in% cpm.timecourse.v3.0$transcript_ID) %>% gather(sample,value,-1) %>% dplyr::select(value) %>% as_vector()) # OK. removing low expressed genes.
+
+library(WGCNA)
+```
+
+# twoafternoon.trtlive 
+## reading DEG
+```{r}
+twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.trtlive.DEGs.all.v3.0anno.csv"))
+
+```
+# format data
+```{r}
+# select genes with higher CV 
+## classic way
+co.var.df <- function(x) ( 100*apply(x,1,sd)/rowMeans(x) )
+cpm.timecourse.v3.0$cv<-co.var.df(cpm.timecourse.v3.0[,-1])
+# tidyverse way (no working)
+#cpm.timecourse.v3.0 %>% slice(1:100) %>% select(-1) %>% group_by(%>% mutate(cv=map(.,co.var.df ))
+a<-hist(cpm.timecourse.v3.0$cv)
+a
+# there are genes with extream value
+cpm.timecourse.v3.0 %>% filter(cv>600)
+# Check expression pattern
+expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2(target.genes = cpm.timecourse.v3.0 %>% dplyr::filter(cv>450) %>% dplyr::slice(1:20)) ->p
+p
+ggsave(filename="../output/superhighCV.genes.expression.png",width=11,height=8) # should I removce them????
+# 
+sum(as.integer(cpm.timecourse.v3.0$cv>30))/dim(cpm.timecourse.v3.0)[1] # [1] 0.5207265
+sum(as.integer(cpm.timecourse.v3.0$cv>40))/dim(cpm.timecourse.v3.0)[1] # [1] 0.3725282. Larger CV than SAS timecourse data ()
+# cf. sum(as.integer(SAS.expression.vst.s.kazu$cv>4.5))/dim(SAS.expression.vst.s.kazu)[1] #[1] 0.2300789
+# use lon transformed data
+cpm.timecourse.v3.0.log.largeCV<-cpm.timecourse.v3.0.log[cpm.timecourse.v3.0$cv>40,] 
+dim(cpm.timecourse.v3.0.log.largeCV) # [1] 17262   289 (cf. SAS.expression.vst.s.kazu.largeCV is 7025 288)
+
+###########
+#save(cpm.timecourse.v3.0.log.largeCV,file=file.path("..","output","cpm.timecourse.v3.0.log.largeCV.Rdata"))
+write_csv(cpm.timecourse.v3.0.log.largeCV,path=file.path("..","output","cpm.timecourse.v3.0.log.largeCV.csv.gz"))
+```
+
+# WGCNA
+## co-expression analysis by WGCNA
+```{r eval=FALSE}
+# The following setting is important, do not omit.
+library(WGCNA) # errors in installing WGCNA on my computer at impute package installation (Jan 27, 2020). Use Whitney
+options(stringsAsFactors = FALSE)
+if(Sys.info()["nodename"]=="whitney") {
+  enableWGCNAThreads(10) # in Whitney (Maloof lab server) 
+} else if (Sys.info()["nodename"]=="Kazu-MBP.plb.ucdavis.edu") {
+      enableWGCNAThreads(2) # in my computer
+  }
+```
+
+# run this in Whitney
+```{r eval=FALSE}
+#cpm.timecourse.v3.0.log.largeCV<-read_csv(file.path("..","output","cpm.timecourse.v3.0.log.largeCV.csv.gz"))
+# for some reasons in Whitney library columns were read ad character. Needs to fix it.
+#cpm.timecourse.v3.0.log.largeCV<-read_csv(file.path("..","output","cpm.timecourse.v3.0.log.largeCV.csv.gz"),
+#                                          col_types=list(col_character(),col_double())) # error
+cpm.timecourse.v3.0.log.largeCV<-read.csv(file.path("..","output","cpm.timecourse.v3.0.log.largeCV.csv.gz")) # using classic read.csv in Whitney
+
+#load(file.path("..","output","cpm.timecourse.v3.0.log.largeCV.Rdata"))
+# 
+ datExpr <-t(cpm.timecourse.v3.0.log.largeCV[,-1])
+  # Choose a set of soft-thresholding powers
+  powers = c(c(1:9), seq(from = 2, to=20, by=10))
+  sft = pickSoftThreshold(datExpr, powerVector = powers, verbose = 5)  
+  # Plot the results:
+  #sizeGrWindow(9, 5)
+  pdf("../output/largeCV.softthresholding.pdf",width=10,height=8)
+  par(mfrow = c(1,2));
+  cex1 = 0.9;
+  # Scale-free topology fit index as a function of the soft-thresholding power
+  plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+       xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+       main = paste("Scale independence"));
+  text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+       labels=powers,cex=cex1,col="red");
+  # this line corresponds to using an R^2 cut-off of h
+  abline(h=0.90,col="red")
+  # Mean connectivity as a function of the soft-thresholding power
+  plot(sft$fitIndices[,1], sft$fitIndices[,5],
+       xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+       main = paste("Mean connectivity"))
+  text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+  dev.off()
+  # 
+  net = blockwiseModules(datExpr, power = 9,
+                         TOMType = "unsigned", minModuleSize = 20,
+                         reassignThreshold = 0, mergeCutHeight = 0.25,
+                         numericLabels = TRUE, pamRespectsDendro = FALSE,
+                         saveTOMs = TRUE,
+                         saveTOMFileBase = "cpm.timecourse.v3.0.log.largeCV.TOM",
+                         verbose = 3)
+  save(net,file="../output/net.cpm.timecourse.v3.0.log.largeCV.Rdata")  
+  # open a graphics window
+  pdf(file="../output/largeCV.dendrogram.pdf",width=10,height=8)
+  # Convert labels to colors for plotting
+  mergedColors = labels2colors(net$colors)
+  # Plot the dendrogram and the module colors underneath
+  plotDendroAndColors(net$dendrograms[[1]], mergedColors[net$blockGenes[[1]]],
+                      "Module colors",
+                      dendroLabels = FALSE, hang = 0.03,
+                      addGuide = TRUE, guideHang = 0.05)
+  dev.off()
+  # save parameters  
+  moduleLabels = net$colors
+  moduleColors = labels2colors(net$colors)
+  MEs = net$MEs
+  geneTree = net$dendrograms[[1]]
+  save(MEs, moduleLabels, moduleColors, geneTree,file ="../output/all.largeCV.RData")
+
+```
+
+# back to my vomputer to look WGCNA results
+```{r}
+cpm.timecourse.v3.0.log.largeCV<-read.csv(file.path("..","output","cpm.timecourse.v3.0.log.largeCV.csv.gz")) 
+dim(cpm.timecourse.v3.0.log.largeCV) # [1] 17262   289
+load("../output/net.cpm.timecourse.v3.0.log.largeCV.Rdata")  
+load("../output/all.largeCV.RData")
+# how many modules?
+  table(net$colors);length(table(net$colors)) # 23 modules
+
+```
+
+# adding gene name, annotations
+```{r}
+cpm.timecourse.v3.0.log.largeCV.modules <- tibble(
+  transcript_ID=cpm.timecourse.v3.0.log.largeCV$transcript_ID,
+  modules=moduleColors
+)
+#cpm.timecourse.v3.0.log.largeCV.modules.list<-list(transcript_ID=cpm.timecourse.v3.0.log.largeCV$transcript_ID,modules=moduleColors)
+## prep
+# annotation file for v3.0annotation
+Br.v3.0.At.BLAST <- read_csv(file.path("..","Annotation_copy","output","v3.0annotation","Brapa_v3.0_annotated.csv")) 
+# This annotation is redundant with name (Br grene). Eg 
+Br.v3.0.At.BLAST %>% filter(name=="BraA01g040570.3C")
+# reduce the redundancy (112418)
+Br.v3.0anno.At.BLAST.highscore <- Br.v3.0.At.BLAST %>% group_by(name) %>% arrange(desc(score)) %>% dplyr::slice(1)
+# function for adding annotation
+## get object name https://stackoverflow.com/questions/14577412/how-to-convert-variable-object-name-into-string
+myfunc <- function(v1) {
+  deparse(substitute(v1))
+}
+myfunc(foo)
+# adding annotation and write_csv adding ".v3.0anno.csv" to the object name.
+addAnno<-function(DGE) {temp<-left_join(DGE %>% rownames_to_column(var="genes"),Br.v3.0anno.At.BLAST.highscore,by=c(genes="name")) %>%  dplyr::select(genes,names(DGE),AGI, At_symbol, At_short_description, perc_ID); print(deparse(substitute(DGE)));
+write_csv(temp, path=file.path("..","output",paste(deparse(substitute(DGE)),".v3.0anno.csv",sep="")));
+return(temp)} 
+```
+
+# asign moduleColor to corresponding Br genes
+```{r eval=FALSE}
+  #Br.v3.0anno.At.BLAST.highscore.list<-list()
+  Bra.v3.0_cdna.list<-list()
+  #names(Bra.v3.0_cdna.list)<-names(Bra.v3.0_cdna)
+names(Bra.v3.0_cdna) %in% cpm.timecourse.v3.0.log.largeCV.modules$transcript_ID
+
+  for(i in 1:length(Bra.v3.0_cdna)) {
+    print(paste("i is ",i))
+    print(cpm.timecourse.v3.0.log.largeCV.modules %>% dplyr::filter(transcript_ID==as_vector(names(Bra.v3.0_cdna))[i]) %>% dplyr::select(transcript_ID))
+        print(cpm.timecourse.v3.0.log.largeCV.modules %>% dplyr::filter(transcript_ID==as_vector(names(Bra.v3.0_cdna))[i]) %>% dplyr::select(transcript_ID) %>% dim())
+        print(cpm.timecourse.v3.0.log.largeCV.modules %>% dplyr::filter(transcript_ID==as_vector(names(Bra.v3.0_cdna))[i]) %>% dplyr::select(transcript_ID) %>% dim() ==c(1,1))
+temp<-cpm.timecourse.v3.0.log.largeCV.modules %>% dplyr::filter(transcript_ID==names(Bra.v3.0_cdna)[i]) %>% dplyr::select(transcript_ID)
+print(dim(temp)[1]==0)
+    if(dim(temp)[1]==0) next else
+    #Bra.v3.0_cdna.list[[i]]<-cpm.timecourse.v3.0.log.largeCV.modules[names(Bra.v3.0_cdna)[i],"modules"]
+      # input module
+Bra.v3.0_cdna.list[[i]]<-cpm.timecourse.v3.0.log.largeCV.modules %>% filter(transcript_ID==names(Bra.v3.0_cdna)[i]) %>% dplyr::select(modules) %>% as_vector()
+  # iput gene name
+    names(Bra.v3.0_cdna.list)[[i]]<-names(Bra.v3.0_cdna)[i]
+  }
+
+# clean up Brgo.v3.0_cdna.list
+  table(sapply(Bra.v3.0_cdna.list,is.null))
+  Bra.v3.0_cdna.list<-Bra.v3.0_cdna.list[!sapply(Bra.v3.0_cdna.list,is.null)]
+  table(sapply(Bra.v3.0_cdna.list,is.null))
+  
+  save(Bra.v3.0_cdna.list,file="../output/Bra.v3.0_cdna.list.Rdata")
+ ######### Did not work
+# cpm.timecourse.v3.0.log.largeCV.modules %>% nest(transcript_ID) # this is not what I want
+# library(purrr)
+#cpm.timecourse.v3.0.log.largeCV.modules %>% purrr::transpose() 
+
+```
+
+
+
+# ORA analysis of DEGs
+```{r}
+# loading module info as custom categories compatible with goseq()
+load("../output/Bra.v3.0_cdna.list.Rdata")
+# GOseq
+library(ShortRead);library(goseq);library(GO.db);library("annotate")
+# for ggplot heatmap
+## uncompress gz file
+system(paste("gunzip -c ",file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.gz")," > ",file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.fa")))
+## read cDNA fasta file 
+Bra.v3.0_cdna<-readDNAStringSet(file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.fa")) # copied from /Volumes/data_work/Data8/NGS_related/Brassica_rapa_Upendra/G3
+Bra.v3.0_cdna
+## remove fasta file
+system(paste("rm ",file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.fa"),sep=""))
+# special funciton for GOseq
+GOseq.customcategory.ORA<-function(genelist,padjust=0.05,custom.category.list=Bra.v3.0_cdna.list,Br_cdna=Bra.v3.0_cdna) { # return GO enrichment table, padjus, padjust=0.05. 
+  
+  bias<-nchar(Br_cdna)
+  names(bias)<-names(Br_cdna)
+  TF<-(names(bias) %in% genelist)*1
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  #GO.pval <- goseq(pwf,gene2cat=Brgo.DF3,use_genes_without_cat=TRUE) # format became different in new goseq version (021111)
+  GO.pval$over_represented_padjust<-p.adjust(GO.pval$over_represented_pvalue,method="BH")
+  if(GO.pval$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval[GO.pval$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    return(enriched.GO)
+  }
+}
+```
+
+```{r}
+gene.up<-twoafternoon.trtlive.DEGs.all.v3.0anno %>% filter(logFC>0&FDR<0.05) %>% dplyr::select(genes) %>% as_vector()
+gene.down<-twoafternoon.trtlive.DEGs.all.v3.0anno %>% filter(logFC<0&FDR<0.05) %>% dplyr::select(genes) %>% as_vector()
+
+enriched.GO.up<-GOseq.customcategory.ORA(genelist=gene.up) # needs to wait for Bra.v3.0_cdna.list.Rdata ready in Whitney
+enriched.GO.down<-GOseq.customcategory.ORA(genelist=gene.down)
+
+```
+
+# expression pattern of module/genes of interest (logFC of soil treatment)
+```{r}
+n<-1
+gene.up.category<-cpm.timecourse.v3.0.log.largeCV.modules %>% filter(transcript_ID %in% gene.up,modules==enriched.GO.up$category[n])
+expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2(target.genes=gene.up.category[1:10,]) # works
+```
+# expression pattern of module/genes of interest (normalized value)
+```{r}
+# scaling expression data
+cpm.timecourse.v3.0.scale<-t(scale(t(cpm.timecourse.v3.0[,-1]))) %>% as_tibble() %>% bind_cols(data.frame(transcript_ID=cpm.timecourse.v3.0$transcript_ID[]),.)
+
+gene.up.category<-cpm.timecourse.v3.0.log.largeCV.modules %>% filter(transcript_ID %in% gene.up,modules==enriched.GO.up$category[n])
+gene.down.category<-cpm.timecourse.v3.0.log.largeCV.modules %>% filter(transcript_ID %in% gene.down,modules==enriched.GO.up$category[n])
+
+expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2(data=cpm.timecourse.v3.0.scale,target.genes=gene.up.category[1,]) 
+
+```
+
+# using map-column method???
+```{r}
+input<-tribble(
+  ~target.genes,~data,~f,
+  gene.up.category[1:10,],cpm.timecourse.v3.0.scale,expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2,
+  gene.down.category[1:10,],cpm.timecourse.v3.0.scale,expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2
+)
+input2<-tribble(
+  ~f,~param,
+  expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2,list(target.genes=gene.up.category[1:10,],data=cpm.timecourse.v3.0.scale),
+  expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2,list(target.genes=gene.down.category[1:10,],data=cpm.timecourse.v3.0.scale)
+)
+
+test<-input2 %>% mutate(output=invoke_map(f,param)) # works, but parameters are not visible
+
+# how about to use map2?
+## an example
+params<-tribble(
+    ~mean,~sd,~n,
+  5,1,1,
+  10,5,3,
+  -3,10,5
+)
+params %>% pmap(rnorm) 
+# 
+input3<-tribble(
+  ~target.genes,~data,~title,
+  gene.up.category[1:10,],cpm.timecourse.v3.0.scale,"2-afternoon soil up",
+  gene.down.category[1:10,],cpm.timecourse.v3.0.scale,"2-afternoon soil down",
+)
+#input3 %>% pmap(expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2) -> expression.pattern
+# 
+expression.pattern <- input3 %>% mutate(plot=pmap(.,expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2))
+expression.pattern$plot[1] # plot
+#input3 %>% mutate(plot=invoke_map(~expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2)) # errors
+
+
+```
+
+# calculate fold change (trial with six genes) (run only once)
+```{r eval=FALSE}
+temp.abs<-cpm.timecourse.v3.0.log %>% head() %>%
+  gather(sample,value,-transcript_ID) %>%
+  mutate(abs.value=2^value) %>%
+  inner_join(sample.description.timecourse, by="sample") %>% 
+  split(.$soil_trt) 
+mean.by.soil<-function(x) {group_by(x, group,transcript_ID) %>% summarize(mean=mean(abs.value))}
+temp.abs.mean<-temp.abs %>% map(.,mean.by.soil) 
+cpm.timecourse.v3.0.logFC<-tibble(transcript_ID=temp.abs.mean[["SBC_OLD"]]$transcript_ID,group=temp.abs.mean[["SBC_OLD"]]$group,logFC=log(temp.abs.mean[["SBC_OLD"]]$mean/temp.abs.mean[["ATM_BLANK"]]$mean)) %>% left_join(sample.description.timecourse %>% dplyr::select("group","sampling_day","sampling_time"),by="group")
+# check logFC range
+range(cpm.timecourse.v3.0.logFC$logFC) #(Jan 31, 2020)
+```
+
+# calculate fold change (full genes) (run only once)
+```{r eval=FALSE}
+temp.abs<-cpm.timecourse.v3.0.log  %>%
+  gather(sample,value,-transcript_ID) %>% mutate(abs.value=2^value) %>%
+  inner_join(sample.description.timecourse, by="sample") %>% 
+  split(.$soil_trt) 
+# mean of absolute value funciton
+mean.by.soil<-function(x) {group_by(x, group,transcript_ID) %>% summarize(mean=mean(abs.value))}
+# calculating absolute value mean
+temp.abs.mean<-temp.abs %>% map(.,mean.by.soil) 
+# making summary tibble
+temp2<-sample.description.timecourse %>% dplyr::select("group","sampling_day","sampling_time")
+sample.description.timecourse.logFC<-temp2[!duplicated(temp2),]
+# add sample info
+cpm.timecourse.v3.0.logFC<-tibble(transcript_ID=temp.abs.mean[["SBC_OLD"]]$transcript_ID,group=temp.abs.mean[["SBC_OLD"]]$group,logFC=log(temp.abs.mean[["SBC_OLD"]]$mean/temp.abs.mean[["ATM_BLANK"]]$mean)) %>% left_join(sample.description.timecourse.logFC,by="group")
+# check
+dim(cpm.timecourse.v3.0.logFC)
+# check frequency distribution
+a<-hist(cpm.timecourse.v3.0.logFC$logFC) # most of them are small
+a
+# what are genes with super high logFC?
+high.FC.genes<-cpm.timecourse.v3.0.logFC %>% filter(abs(logFC)>5) %>% dplyr::select(transcript_ID) 
+expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2(target.genes = high.FC.genes[1:10,])
+#
+addAnno2<-function(DGE) {temp<-left_join(DGE,Br.v3.0anno.At.BLAST.highscore,by=c("transcript_ID"="name")) %>%  dplyr::select(transcript_ID,names(DGE),AGI, At_symbol, At_short_description, perc_ID); print(deparse(substitute(DGE)));
+write_csv(temp, path=file.path("..","output",paste(deparse(substitute(DGE)),".v3.0anno.csv",sep="")));
+return(temp)} 
+#
+addAnno2(high.FC.genes)
+#
+dim(cpm.timecourse.v3.0.logFC) #[1] 1110000       5
+
+#write_csv(cpm.timecourse.v3.0.logFC,path="../output/cpm.timecourse.v3.0.logFC.csv") # too large (306 M)
+write_csv(cpm.timecourse.v3.0.logFC,path="../output/cpm.timecourse.v3.0.logFC.csv.gz") # 12.3 M
+
+```
+
+# logFC expression pattern (only two afternoon)
+```{r}
+#cpm.timecourse.v3.0.logFC <-read_csv("../output/cpm.timecourse.v3.0.logFC.csv.gz")
+target.genes<-gene.up
+expression.pattern.Br.graph.timecourse.v3.0annotation.logFC<-function(data=cpm.timecourse.v3.0.logFC,target.genes,title="",subset.data="only_two_afternoon"){
+#print(paste("data is",data[1:10,]))
+#print(paste("tissue.type is root"))
+data[is.na(data)] <- 0 #
+data.temp<-data  %>% dplyr::filter(transcript_ID %in% target.genes) 
+
+# if (2-afternoon=TRUE)
+if (subset.data=="only_two_afternoon") {
+p<-data.temp %>% ggplot(aes(x=sampling_day,y=logFC))  + 
+  geom_boxplot(alpha = 0.5)  + 
+  theme_bw() +
+  theme(strip.text.y=element_text(angle=0),axis.text.x=element_text(angle=90)) +
+  theme(legend.position="bottom") + labs(title=title)
+p
+} else {print("Define subset.data other than only_two_afternoon.")}
+}
+# test the function
+expression.pattern.Br.graph.timecourse.v3.0annotation.logFC(target.genes=gene.up,subset.data="only_two_afternoon")
+```
+
+
+# J meeting (Jan 28, 2020)
+* Maybe focusing on 2-afternoon genes to eliminate diurnal effects
+* expression pattern 
+** 1. logFC (live vs dead)
+** 2. plot eigengenes
+** 3. plot x= days
+** 4. patterns within DEGs by K-means or others (SOM, etc) to answer DEGS are mixtures or not. (combined with 1. and 3.)
+** 5. Using map2
+
+# K-means clustering
+* Reference: https://2-bitbio.com/2017/10/clustering-rnaseq-data-using-k-means.html
+```{r}
+# 2_afternoon DEG expression data (scaled)
+cpm.timecourse.v3.0.scale.twoafternoon.DEG<-cpm.timecourse.v3.0.scale %>% dplyr::select(-cv) %>% 
+  inner_join(twoafternoon.trtlive.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dplyr::select(genes),by=c(transcript_ID="genes")) %>%
+gather(sample,value,-1) %>% inner_join(sample.description.timecourse,by="sample") %>% filter(sampling_time=="2_afternoon")
+# spread
+cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread<-cpm.timecourse.v3.0.scale.twoafternoon.DEG %>% dplyr::select(transcript_ID,sample,value) %>% spread(sample,value,-1)
+dim(cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread) # [1] 1442  97
+# calculate wss
+wss <- (nrow(cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread[,-1])-1)*sum(apply(cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread[,-1],2,var))
+for (i in 2:20) wss[i] <- sum(kmeans(cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread[,-1],
+                                     centers=i,iter.max = 10)$withinss) # If default iter.max=10 gave me "did not converge in 10 iterations" error. Solution: https://r.789695.n4.nabble.com/kmeans-quot-did-not-converge-in-10-iterations-quot-td797019.html.
+plot(1:20, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+Let’s perform the actual clsutering using K=8:
+```{r}
+set.seed(20)
+kClust.8 <- kmeans(cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread[,-1], centers=8, nstart = 1000, iter.max = 20)
+kClusters.8 <- kClust.8$cluster
+# number of clusters
+cluster.8.num<-tibble(cluster=kClusters.8) %>% group_by(cluster) %>% summarize(n=sum(cluster)) 
+cluster.8.num$cluster<-as.character(cluster.8.num$cluster) # classic way
+```
+Now we can calculate the cluster ‘cores’ aka centroids:
+# function to find centroid in cluster i
+```{r}
+clust.centroid = function(i, dat, clusters) {
+  ind = (clusters == i)
+  colMeans(dat[ind,])
+}
+kClustcentroids <- sapply(levels(factor(kClusters.8)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread[,-1], kClusters.8)
+```
+# Plotting the centroids to see how they behave: tidyverse version
+```{r}
+library(glue)
+p8<-kClustcentroids %>% as_tibble(rownames="sample") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse,by="sample") %>% 
+  inner_join(cluster.8.num,by="cluster") %>%
+    mutate(cluster.n=glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) ) %>%
+  ggplot(aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster))) + 
+  geom_point() + geom_hline(yintercept=0,color="red") +
+  facet_grid(cluster.n~sampling_day) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
+  labs(title= "K-means clustering of two afternoon DEGs (live vs dead soil): eight clusters",color = "Cluster",y="scaled expression level") 
+p8
+# logFC
+kClustcentroids %>% as_tibble(rownames="sample") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse,by="sample") %>% 
+  inner_join(cluster.8.num,by="cluster") %>%
+    mutate(cluster.n=glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) ) 
+
+
+ggsave(p8,file="../output/Twoafternoon.DEG.Kmean.8clusters.png",width=11,height=8)
+```
+
+# Let’s perform the actual clsutering using K=5:
+```{r}
+set.seed(20)
+kClust.5 <- kmeans(cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread[,-1], centers=5, nstart = 1000, iter.max = 20)
+kClusters.5 <- kClust.5$cluster
+# number of clusters
+cluster.5.num<-tibble(cluster=kClusters.5) %>% group_by(cluster) %>% summarize(n=sum(cluster))
+cluster.5.num$cluster<-as.character(cluster.5.num$cluster) # classic way
+
+
+```
+# Now we can calculate the cluster ‘cores’ aka centroids:
+```{r}
+kClustcentroids.5 <- sapply(levels(factor(kClusters.5)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread[,-1], kClusters.5)
+
+```
+# Plotting the centroids to see how they behave: tidyverse version
+```{r}
+p5<-kClustcentroids.5 %>% as_tibble(rownames="sample") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse,by="sample") %>% 
+  inner_join(cluster.5.num,by="cluster") %>%
+    mutate(cluster.n=glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) ) %>%
+  ggplot(aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster))) + 
+  geom_point() + geom_hline(yintercept=0,color="red") +
+  facet_grid(cluster.n~sampling_day) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
+  labs(title= "K-means clustering of two afternoon DEGs (live vs dead soil): five clusters",color = "Cluster",y="scaled expression level") 
+p5
+ggsave(p5,file="../output/Twoafternoon.DEG.Kmean.5clusters.png",width=11,height=8)
+
+```
+
+# logFC K-means (under construction)
+
+```{r}
+expression.pattern.Br.graph.timecourse.v3.0annotation.logFC(target.genes=gene.up,subset.data="only_two_afternoon")
+
+```
+
