@@ -366,24 +366,24 @@ write_csv(cpm.timecourse.v3.0.logFC,path="../output/cpm.timecourse.v3.0.logFC.cs
 
 # logFC expression pattern (only two afternoon)
 ```{r}
-#cpm.timecourse.v3.0.logFC <-read_csv("../output/cpm.timecourse.v3.0.logFC.csv.gz")
+cpm.timecourse.v3.0.logFC <-read_csv("../output/cpm.timecourse.v3.0.logFC.csv.gz")
 target.genes<-gene.up
-expression.pattern.Br.graph.timecourse.v3.0annotation.logFC<-function(data=cpm.timecourse.v3.0.logFC,target.genes,title="",subset.data="only_two_afternoon"){
-#print(paste("data is",data[1:10,]))
-#print(paste("tissue.type is root"))
-data[is.na(data)] <- 0 #
-data.temp<-data  %>% dplyr::filter(transcript_ID %in% target.genes) 
-
-# if (2-afternoon=TRUE)
-if (subset.data=="only_two_afternoon") {
-p<-data.temp %>% ggplot(aes(x=sampling_day,y=logFC))  + 
-  geom_boxplot(alpha = 0.5)  + 
-  theme_bw() +
-  theme(strip.text.y=element_text(angle=0),axis.text.x=element_text(angle=90)) +
-  theme(legend.position="bottom") + labs(title=title)
-p
-} else {print("Define subset.data other than only_two_afternoon.")}
-}
+# expression.pattern.Br.graph.timecourse.v3.0annotation.logFC<-function(data=cpm.timecourse.v3.0.logFC,target.genes,title="",subset.data="only_two_afternoon"){
+# #print(paste("data is",data[1:10,]))
+# #print(paste("tissue.type is root"))
+# data[is.na(data)] <- 0 #
+# data.temp<-data  %>% dplyr::filter(transcript_ID %in% target.genes) 
+# 
+# # if (2-afternoon=TRUE)
+# if (subset.data=="only_two_afternoon") {
+# p<-data.temp %>% ggplot(aes(x=sampling_day,y=logFC))  + 
+#   geom_boxplot(alpha = 0.5)  + 
+#   theme_bw() +
+#   theme(strip.text.y=element_text(angle=0),axis.text.x=element_text(angle=90)) +
+#   theme(legend.position="bottom") + labs(title=title)
+# p
+# } else {print("Define subset.data other than only_two_afternoon.")}
+# }
 # test the function
 expression.pattern.Br.graph.timecourse.v3.0annotation.logFC(target.genes=gene.up,subset.data="only_two_afternoon")
 ```
@@ -499,6 +499,81 @@ ggsave(p5,file="../output/Twoafternoon.DEG.Kmean.5clusters.png",width=11,height=
 
 ```{r}
 expression.pattern.Br.graph.timecourse.v3.0annotation.logFC(target.genes=gene.up,subset.data="only_two_afternoon")
+
+# 2_afternoon DEG expression data (scaled)
+cpm.timecourse.v3.0.logFC.twoafternoon.DEG<-cpm.timecourse.v3.0.logFC %>% 
+  inner_join(twoafternoon.trtlive.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dplyr::select(genes),by=c(transcript_ID="genes")) %>% filter(sampling_time=="2_afternoon")
+# spread
+cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread<-cpm.timecourse.v3.0.logFC.twoafternoon.DEG %>% dplyr::select(transcript_ID,group,logFC) %>% spread(group,logFC,-1)
+dim(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread) # [1] 1474  97
+# calculate wss
+wss.logFC <- (nrow(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1])-1)*sum(apply(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1],2,var))
+for (i in 2:20) wss.logFC[i] <- sum(kmeans(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1],
+                                     centers=i,iter.max = 10)$withinss) # If default iter.max=10 gave me "did not converge in 10 iterations" error. Solution: https://r.789695.n4.nabble.com/kmeans-quot-did-not-converge-in-10-iterations-quot-td797019.html.
+plot(1:20, wss.logFC, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+
+```
+# Let’s perform the actual clsutering using K=5:
+```{r}
+set.seed(20)
+kClust.logFC.5 <- kmeans(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1], centers=5, nstart = 1000, iter.max = 20)
+kClusters.logFC.5 <- kClust.logFC.5$cluster
+# number of clusters
+cluster.5.num<-tibble(cluster=kClusters.logFC.5) %>% group_by(cluster) %>% summarize(n=sum(cluster))
+cluster.5.num$cluster<-as.character(cluster.5.num$cluster) # classic way
+```
+# Now we can calculate the cluster ‘cores’ aka centroids:
+```{r}
+kClustcentroids.logFC.5 <- sapply(levels(factor(kClusters.logFC.5)), clust.centroid, cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1], kClusters.logFC.5)
+
+```
+# Plotting the centroids to see how they behave: tidyverse version
+```{r}
+p.logFC.5<-kClustcentroids.logFC.5 %>% as_tibble(rownames="group") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse.logFC,by="group") %>% 
+  inner_join(cluster.5.num,by="cluster") %>%
+    mutate(cluster.n=glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) ) %>%
+  ggplot(aes(x=sampling_day,y=value, group=cluster, colour=as.factor(cluster))) + 
+  geom_point() + geom_hline(yintercept=0,color="red") +
+  facet_grid(cluster.n~.) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
+  labs(title= "K-means clustering of two afternoon DEGs (live vs dead soil): five clusters",color = "Cluster",y="scaled expression level") 
+p.logFC.5
+ggsave(p.logFC.5,file="../output/Twoafternoon.DEG.logFC.Kmean.5clusters.png",width=11,height=8)
+
+```
+
+# Let’s perform the actual clsutering using K=8:
+```{r}
+set.seed(20)
+kClust.logFC.8 <- kmeans(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1], centers=8, nstart = 1000, iter.max = 20)
+kClusters.logFC.8 <- kClust.logFC.8$cluster
+# number of clusters
+cluster.8.num<-tibble(cluster=kClusters.logFC.8) %>% group_by(cluster) %>% summarize(n=sum(cluster))
+cluster.8.num$cluster<-as.character(cluster.8.num$cluster) # classic way
+```
+# Now we can calculate the cluster ‘cores’ aka centroids:
+```{r}
+kClustcentroids.logFC.8 <- sapply(levels(factor(kClusters.logFC.8)), clust.centroid, cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1], kClusters.logFC.8)
+
+```
+# Plotting the centroids to see how they behave: tidyverse version
+```{r}
+p.logFC.8<-kClustcentroids.logFC.8 %>% as_tibble(rownames="group") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse.logFC,by="group") %>% 
+  inner_join(cluster.8.num,by="cluster") %>%
+    mutate(cluster.n=glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) ) %>%
+  ggplot(aes(x=sampling_day,y=value, group=cluster, colour=as.factor(cluster))) + 
+  geom_point() + geom_hline(yintercept=0,color="red") +
+  facet_grid(cluster.n~.) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
+  labs(title= "K-means clustering of two afternoon DEGs (live vs dead soil): eight clusters",color = "Cluster",y="scaled expression level") 
+p.logFC.8
+ggsave(p.logFC.8,file="../output/Twoafternoon.DEG.logFC.Kmean.8clusters.png",width=11,height=8)
 
 ```
 

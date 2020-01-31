@@ -261,3 +261,25 @@ expression.pattern.Br.graph.timecourse.v3.0annotation.cpm<-function(data=cpm.tim
     p
 }
 
+# logFC timecourse
+expression.pattern.Br.graph.timecourse.v3.0annotation.logFC<-function(data=cpm.timecourse.v3.0.logFC,target.genes,title="",subset.data="only_two_afternoon"){
+  #print(paste("data is",data[1:10,]))
+  #print(paste("tissue.type is root"))
+  data[is.na(data)] <- 0 #
+  data.temp<-data  %>% dplyr::filter(transcript_ID %in% target.genes) 
+  
+  # if (2-afternoon=TRUE)
+  if (subset.data=="only_two_afternoon") {
+    p<-data.temp %>% ggplot(aes(x=sampling_day,y=logFC))  + 
+      geom_boxplot(alpha = 0.5)  + 
+      theme_bw() +
+      theme(strip.text.y=element_text(angle=0),axis.text.x=element_text(angle=90)) +
+      theme(legend.position="bottom") + labs(title=title)
+    p
+  } else {print("Define subset.data other than only_two_afternoon.")}
+}
+
+
+
+
+
