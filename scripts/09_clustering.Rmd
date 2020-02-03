@@ -1,12 +1,11 @@
 ---
 title: "09_clustering"
-output: html_notebook
-editor_options: 
+output:
+  html_document:
+    df_print: paged
+editor_options:
   chunk_output_type: console
 ---
-```{r}
-
-```
 
 ```{r setup, include=FALSE}
 library(knitr)
@@ -22,15 +21,20 @@ cpm.timecourse.v3.0<-cpm.timecourse.v3.0[rowSums(cpm.timecourse.v3.0[,-1]>1) >=2
 dim(cpm.timecourse.v3.0) # [1] 27308   289
 # log transformed data
 cpm.timecourse.v3.0.log.summary<-hist(cpm.timecourse.v3.0.log %>% gather(sample,value,-1) %>% dplyr::select(value) %>% as_vector()) # OK. log transformed
-cpm.timecourse.v3.0.log.summary<-hist(cpm.timecourse.v3.0.log %>% filter(transcript_ID %in% cpm.timecourse.v3.0$transcript_ID) %>% gather(sample,value,-1) %>% dplyr::select(value) %>% as_vector()) # OK. removing low expressed genes.
+cpm.timecourse.v3.0.log.summary<-hist(cpm.timecourse.v3.0.log %>% filter(transcript_ID %in% cpm.timecourse.v3.0$transcript_ID) %>% gather(sample,value,-1) %>% dplyr::select(value) %>% as_vector()) # OK. 
+# removing low expressed genes from cpm.timecourse.v3.0.log
+cpm.timecourse.v3.0.log <- cpm.timecourse.v3.0.log %>% filter(transcript_ID %in% cpm.timecourse.v3.0$transcript_ID)
+dim(cpm.timecourse.v3.0.log) #[1] 27308   289
 
-library(WGCNA)
+# library(WGCNA) # unable to be installed in R3.6.2
 ```
 
-# twoafternoon.trtlive 
+# twoafternoon.trtlive, twoafternoon.any.trtlive
 ## reading DEG
 ```{r}
 twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.trtlive.DEGs.all.v3.0anno.csv"))
+twoafternoon.any.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.any.trtlive.DEGs.all.v3.0anno.csv"))
+
 
 ```
 # format data
@@ -48,14 +52,22 @@ cpm.timecourse.v3.0 %>% filter(cv>600)
 # Check expression pattern
 expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2(target.genes = cpm.timecourse.v3.0 %>% dplyr::filter(cv>450) %>% dplyr::slice(1:20)) ->p
 p
-ggsave(filename="../output/superhighCV.genes.expression.png",width=11,height=8) # should I removce them????
+ggsave(filename="../output/highCV.absvalue.genes.expression.png",width=11,height=8) # should I remove them????
 # 
 sum(as.integer(cpm.timecourse.v3.0$cv>30))/dim(cpm.timecourse.v3.0)[1] # [1] 0.5207265
-sum(as.integer(cpm.timecourse.v3.0$cv>40))/dim(cpm.timecourse.v3.0)[1] # [1] 0.3725282. Larger CV than SAS timecourse data ()
+sum(as.integer(cpm.timecourse.v3.0$cv>40))/dim(cpm.timecourse.v3.0)[1] # [1] 0.3725282. Larger CV than SAS timecourse data ()??? Due to non log absolute expression value.
 # cf. sum(as.integer(SAS.expression.vst.s.kazu$cv>4.5))/dim(SAS.expression.vst.s.kazu)[1] #[1] 0.2300789
+```
 # use lon transformed data
-cpm.timecourse.v3.0.log.largeCV<-cpm.timecourse.v3.0.log[cpm.timecourse.v3.0$cv>40,] 
-dim(cpm.timecourse.v3.0.log.largeCV) # [1] 17262   289 (cf. SAS.expression.vst.s.kazu.largeCV is 7025 288)
+```{r}
+cpm.timecourse.v3.0.log$cv<-co.var.df(cpm.timecourse.v3.0.log[,-1])
+b<-hist(cpm.timecourse.v3.0.log$cv)
+b
+# use largeCV 
+cpm.timecourse.v3.0.log.largeCV<-cpm.timecourse.v3.0.log[cpm.timecourse.v3.0[cpm.timecourse.v3.0$cv>40,"transcript_ID"],] 
+dim(cpm.timecourse.v3.0.log.largeCV) # [1] 17262   289  > [1] 10173   290  (02/01/2020) (cf. SAS.expression.vst.s.kazu.largeCV is 7025 288)
+c<-hist(cpm.timecourse.v3.0.log.largeCV$cv)
+c
 
 ###########
 #save(cpm.timecourse.v3.0.log.largeCV,file=file.path("..","output","cpm.timecourse.v3.0.log.largeCV.Rdata"))
@@ -139,11 +151,11 @@ cpm.timecourse.v3.0.log.largeCV<-read.csv(file.path("..","output","cpm.timecours
 # back to my vomputer to look WGCNA results
 ```{r}
 cpm.timecourse.v3.0.log.largeCV<-read.csv(file.path("..","output","cpm.timecourse.v3.0.log.largeCV.csv.gz")) 
-dim(cpm.timecourse.v3.0.log.largeCV) # [1] 17262   289
+dim(cpm.timecourse.v3.0.log.largeCV) # [1] 17262   289 -> [1] 10173   290 (Feb 01, 2020)
 load("../output/net.cpm.timecourse.v3.0.log.largeCV.Rdata")  
 load("../output/all.largeCV.RData")
 # how many modules?
-  table(net$colors);length(table(net$colors)) # 23 modules
+  table(net$colors);length(table(net$colors)) # 7 modules
 
 ```
 
@@ -431,33 +443,29 @@ clust.centroid = function(i, dat, clusters) {
   ind = (clusters == i)
   colMeans(dat[ind,])
 }
-kClustcentroids <- sapply(levels(factor(kClusters.8)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread[,-1], kClusters.8)
+kClustcentroids.8 <- sapply(levels(factor(kClusters.8)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread[,-1], kClusters.8)
 ```
 # Plotting the centroids to see how they behave: tidyverse version
 ```{r}
 library(glue)
-p8<-kClustcentroids %>% as_tibble(rownames="sample") %>% 
+# adding sample description to data
+  data.sample<-kClustcentroids.8 %>% as_tibble(rownames="sample") %>% 
   gather(cluster,value,-1) %>% 
   inner_join(sample.description.timecourse,by="sample") %>% 
   inner_join(cluster.8.num,by="cluster") %>%
     mutate(cluster.n=glue('{cluster2} \n({n2})',
                           cluster2=cluster,
-                          n2=n) ) %>%
-  ggplot(aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster))) + 
-  geom_point() + geom_hline(yintercept=0,color="red") +
+                          n2=n) )
+# data.group for adding group cluster mean
+  data.group<-data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% group_by(group.cluster) %>% summarize(group.cluster.mean=mean(value)) %>%  inner_join(
+    data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% dplyr::select("group.cluster","sampling_day","soil_trt","cluster.n","cluster"),by="group.cluster") %>%  dplyr::slice(rep(1:768)[!duplicated(.$group.cluster)]) 
+# plot
+  p8<-  ggplot(data.sample,aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster))) + 
+  geom_point() + geom_hline(yintercept=0,color="red") + 
+  geom_line(data=data.group,aes(x=soil_trt,y=group.cluster.mean)) +
   facet_grid(cluster.n~sampling_day) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
   labs(title= "K-means clustering of two afternoon DEGs (live vs dead soil): eight clusters",color = "Cluster",y="scaled expression level") 
 p8
-# logFC
-kClustcentroids %>% as_tibble(rownames="sample") %>% 
-  gather(cluster,value,-1) %>% 
-  inner_join(sample.description.timecourse,by="sample") %>% 
-  inner_join(cluster.8.num,by="cluster") %>%
-    mutate(cluster.n=glue('{cluster2} \n({n2})',
-                          cluster2=cluster,
-                          n2=n) ) 
-
-
 ggsave(p8,file="../output/Twoafternoon.DEG.Kmean.8clusters.png",width=11,height=8)
 ```
 
@@ -479,23 +487,28 @@ kClustcentroids.5 <- sapply(levels(factor(kClusters.5)), clust.centroid, cpm.tim
 ```
 # Plotting the centroids to see how they behave: tidyverse version
 ```{r}
-p5<-kClustcentroids.5 %>% as_tibble(rownames="sample") %>% 
+# adding sample description to data
+  data.sample<-kClustcentroids.5 %>% as_tibble(rownames="sample") %>% 
   gather(cluster,value,-1) %>% 
   inner_join(sample.description.timecourse,by="sample") %>% 
   inner_join(cluster.5.num,by="cluster") %>%
     mutate(cluster.n=glue('{cluster2} \n({n2})',
                           cluster2=cluster,
-                          n2=n) ) %>%
-  ggplot(aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster))) + 
-  geom_point() + geom_hline(yintercept=0,color="red") +
+                          n2=n) )
+# data.group for adding group cluster mean
+  data.group<-data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% group_by(group.cluster) %>% summarize(group.cluster.mean=mean(value)) %>%  inner_join(
+    data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% dplyr::select("group.cluster","sampling_day","soil_trt","cluster.n","cluster"),by="group.cluster") %>%  dplyr::slice(rep(1:480)[!duplicated(.$group.cluster)]) # only cluster 1... why???
+# plot
+  p5<-  ggplot(data.sample,aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster))) + 
+  geom_point() + geom_hline(yintercept=0,color="red") + 
+  geom_line(data=data.group,aes(x=soil_trt,y=group.cluster.mean)) +
   facet_grid(cluster.n~sampling_day) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
   labs(title= "K-means clustering of two afternoon DEGs (live vs dead soil): five clusters",color = "Cluster",y="scaled expression level") 
 p5
 ggsave(p5,file="../output/Twoafternoon.DEG.Kmean.5clusters.png",width=11,height=8)
-
 ```
 
-# logFC K-means (under construction)
+# logFC K-means 
 
 ```{r}
 expression.pattern.Br.graph.timecourse.v3.0annotation.logFC(target.genes=gene.up,subset.data="only_two_afternoon")
@@ -509,7 +522,7 @@ dim(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread) # [1] 1474  97
 # calculate wss
 wss.logFC <- (nrow(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1])-1)*sum(apply(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1],2,var))
 for (i in 2:20) wss.logFC[i] <- sum(kmeans(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1],
-                                     centers=i,iter.max = 10)$withinss) # If default iter.max=10 gave me "did not converge in 10 iterations" error. Solution: https://r.789695.n4.nabble.com/kmeans-quot-did-not-converge-in-10-iterations-quot-td797019.html.
+                                     centers=i,iter.max = 10)$withinss,iter.max=20) # If default iter.max=10 gave me "did not converge in 10 iterations" error. Solution: https://r.789695.n4.nabble.com/kmeans-quot-did-not-converge-in-10-iterations-quot-td797019.html.
 plot(1:20, wss.logFC, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
 
 ```
@@ -529,6 +542,10 @@ kClustcentroids.logFC.5 <- sapply(levels(factor(kClusters.logFC.5)), clust.centr
 ```
 # Plotting the centroids to see how they behave: tidyverse version
 ```{r}
+# making sample.description.timecourse.logFC
+temp2<-sample.description.timecourse %>% dplyr::select("group","sampling_day","sampling_time")
+sample.description.timecourse.logFC<-temp2[!duplicated(temp2),]
+# plot
 p.logFC.5<-kClustcentroids.logFC.5 %>% as_tibble(rownames="group") %>% 
   gather(cluster,value,-1) %>% 
   inner_join(sample.description.timecourse.logFC,by="group") %>% 
@@ -573,7 +590,219 @@ p.logFC.8<-kClustcentroids.logFC.8 %>% as_tibble(rownames="group") %>%
   facet_grid(cluster.n~.) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
   labs(title= "K-means clustering of two afternoon DEGs (live vs dead soil): eight clusters",color = "Cluster",y="scaled expression level") 
 p.logFC.8
+
 ggsave(p.logFC.8,file="../output/Twoafternoon.DEG.logFC.Kmean.8clusters.png",width=11,height=8)
 
 ```
+# conclusion
+* Absolute value with cluster 8 is better.
+
+# load Brgo.v3.0anno.Atgoslim.BP.list
+```{r eval=TRUE,error=TRUE}
+load(file.path("..","Annotation_copy","output","v3.0annotation","Brgo.v3.0anno.Atgoslim.BP.list.Rdata"))
+```
+# load GO.ORA function
+# GOseq function for Brassica rapa (v3.0)
+```{r eval=TRUE,error=TRUE}
+# GOseq
+library(ShortRead);library(goseq);library(GO.db);library("annotate")
+# for ggplot heatmap
+## uncompress gz file
+system(paste("gunzip -c ",file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.gz")," > ",file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.fa")))
+## read cDNA fasta file 
+Bra.v3.0_cdna<-readDNAStringSet(file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.fa")) # copied from /Volumes/data_work/Data8/NGS_related/Brassica_rapa_Upendra/G3
+Bra.v3.0_cdna
+## remove fasta file
+system(paste("rm ",file.path("..","Annotation_copy","input","v3.0annotation","Brapa_genome_v3.0_cds.fa"),sep=""))
+# GOseq function
+GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA<-function(genelist,padjust=0.05,ontology="BP",custom.category.list=Brgo.v3.0anno.Atgoslim.BP.list,Br_cdna=Bra.v3.0_cdna) { # return GO enrichment table, padjus, padjust=0.05. 
+  
+  bias<-nchar(Br_cdna)
+  names(bias)<-names(Br_cdna)
+  TF<-(names(bias) %in% genelist)*1
+  names(TF)<-names(bias)
+  #print(TF)
+  pwf<-nullp(TF,bias.data=bias)
+  #print(pwf$DEgenes)
+  GO.pval <- goseq(pwf,gene2cat=custom.category.list,use_genes_without_cat=TRUE) # format became different in new goseq version (021111). Does not work (042716)
+  #GO.pval <- goseq(pwf,gene2cat=Brgo.DF3,use_genes_without_cat=TRUE) # format became different in new goseq version (021111)
+  
+  #head(GO.pval) 
+  if(ontology=="BP") {
+    GO.pval2<-subset(GO.pval,ontology=="BP")
+  } else if(ontology=="CC") {
+    GO.pval2<-subset(GO.pval,ontology=="CC")
+  } else {
+    GO.pval2<-subset(GO.pval,ontology=="MF")
+  }
+    
+  GO.pval2$over_represented_padjust<-p.adjust(GO.pval2$over_represented_pvalue,method="BH")
+  if(GO.pval2$over_represented_padjust[1]>padjust) return("no enriched GO")
+  else {
+    enriched.GO<-GO.pval2[GO.pval2$over_represented_padjust<padjust,] 
+    print("enriched.GO is")
+    print(enriched.GO)
+    
+    ## write Term and Definition 
+    for(i in 1:dim(enriched.GO)[1]) {
+      if(is.null(Term(GOTERM[enriched.GO[i,"category"]]))) {next} else {
+      enriched.GO$Term[i]<-Term(GOTERM[[enriched.GO[i,"category"]]])
+      enriched.GO$Definition[i]<-Definition(GOTERM[[enriched.GO[i,"category"]]])
+      }
+    }
+    return(enriched.GO)
+  }
+}
+#
+head(Bra.v3.0_cdna)
+# length(bias) # 44239 > 45019 where the bias come from?
+#  bias.data vector must have the same length as DEgenes vector!
+```
+# GO ORA of each cluster
+* Use map-column! Yeh!
+```{r}
+temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.twoafternoon.DEG.spread$transcript_ID, cluster=kClusters.8) %>% split(.$cluster) %>% map(function(x) {GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(genelist=x$transcript_ID)})
+# convert list to data.frame
+temp %>% enframe(name="cluster") %>% unnest(value) %>% write_csv(path="../output/twoafternoon.trtsoil.DEG.Kmeans.cluster.csv")
+
+```
+
+# any trt DEGs (two afternoon) clustering and cluster ORAs
+
+# K-means clustering
+* Reference: https://2-bitbio.com/2017/10/clustering-rnaseq-data-using-k-means.html
+```{r}
+# 2_afternoon DEG expression data (scaled)
+cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG<-cpm.timecourse.v3.0.scale %>% dplyr::select(-cv) %>% 
+  inner_join(twoafternoon.any.trtlive.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dplyr::select(genes),by=c(transcript_ID="genes")) %>%
+gather(sample,value,-1) %>% inner_join(sample.description.timecourse,by="sample") %>% filter(sampling_time=="2_afternoon")
+# spread
+cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread<-cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG %>% dplyr::select(transcript_ID,sample,value) %>% spread(sample,value,-1)
+dim(cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread) # [1] 2178   97
+# calculate wss
+wss <- (nrow(cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1])-1)*sum(apply(cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1],2,var))
+for (i in 2:20) wss[i] <- sum(kmeans(cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1],
+                                     centers=i,iter.max = 10)$withinss) # If default iter.max=10 gave me "did not converge in 10 iterations" error. Solution: https://r.789695.n4.nabble.com/kmeans-quot-did-not-converge-in-10-iterations-quot-td797019.html.
+plot(1:20, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+Let’s perform the actual clsutering using K=8:
+```{r}
+set.seed(20)
+kClust.any.trtlive.8 <- kmeans(cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1], centers=8, nstart = 1000, iter.max = 20)
+kClusters.any.trtlive.8 <- kClust.any.trtlive.8$cluster
+# number of clusters
+cluster.any.trtlive.8.num<-tibble(cluster=kClusters.any.trtlive.8) %>% group_by(cluster) %>% summarize(n=n()) 
+cluster.any.trtlive.8.num$cluster<-as.character(cluster.any.trtlive.8.num$cluster) # classic way
+cluster.any.trtlive.8.num
+
+```
+Now we can calculate the cluster ‘cores’ aka centroids:
+# function to find centroid in cluster i
+```{r}
+clust.centroid = function(i, dat, clusters) {
+  ind = (clusters == i)
+  colMeans(dat[ind,])
+}
+
+kClustcentroids.any.trtlive.8 <- sapply(levels(factor(kClusters.any.trtlive.8)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1], kClusters.any.trtlive.8)
+kClustcentroids.any.trtlive.8
+```
+# Plotting the centroids to see how they behave: tidyverse version
+```{r}
+library(glue)
+# adding sample description to data
+  data.sample<-kClustcentroids.any.trtlive.8 %>% as_tibble(rownames="sample") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse,by="sample") %>% 
+  inner_join(cluster.any.trtlive.8.num,by="cluster") %>%
+    mutate(cluster.n=glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) )
+# data.group for adding group cluster mean
+  data.group<-data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% group_by(group.cluster) %>% summarize(group.cluster.mean=mean(value)) %>%  inner_join(
+    data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% dplyr::select("group.cluster","sampling_day","soil_trt","cluster.n","cluster"),by="group.cluster") %>%  dplyr::slice(rep(1:768)[!duplicated(.$group.cluster)]) 
+# plot
+p8.any.trtlive<-  ggplot(data.sample,aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster))) + 
+  geom_point() + geom_hline(yintercept=0,color="red") + 
+  geom_line(data=data.group,aes(x=soil_trt,y=group.cluster.mean)) +
+  facet_grid(cluster.n~sampling_day) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
+  labs(title= "K-means clustering of two afternoon DEGs (live vs dead soil): eight clusters",color = "Cluster",y="scaled expression level") 
+p8.any.trtlive
+ggsave(p8.any.trtlive,file="../output/Twoafternoon.any.trtlive.DEG.Kmean.8clusters.png",width=11,height=8)
+```
+
+
+
+####### under construction ###
+Let’s perform the actual clsutering using K=15:
+```{r}
+set.seed(20)
+kClust.any.trtlive.15 <- kmeans(cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1], centers=15, nstart = 1000, iter.max = 20)
+kClusters.any.trtlive.15 <- kClust.any.trtlive.15$cluster
+# number of clusters
+cluster.any.trtlive.15.num<-tibble(cluster=kClusters.any.trtlive.15) %>% group_by(cluster) %>% summarize(n=n()) 
+cluster.any.trtlive.15.num$cluster<-as.character(cluster.any.trtlive.15.num$cluster) # classic way
+cluster.any.trtlive.15.num
+```
+Now we can calculate the cluster ‘cores’ aka centroids:
+# function to find centroid in cluster i
+```{r}
+clust.centroid = function(i, dat, clusters) {
+  ind = (clusters == i)
+  colMeans(dat[ind,])
+}
+
+kClustcentroids.any.trtlive.15 <- sapply(levels(factor(kClusters.any.trtlive.15)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1], kClusters.any.trtlive.15)
+kClustcentroids.any.trtlive.15
+```
+# Plotting the centroids to see how they behave: tidyverse version
+```{r}
+library(glue)
+# adding sample description to data
+  data.sample<-kClustcentroids.any.trtlive.15 %>% as_tibble(rownames="sample") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse,by="sample") %>% 
+  inner_join(cluster.any.trtlive.15.num,by="cluster") %>%
+    mutate(cluster.n=glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) )
+# data.group for adding group cluster mean
+  data.group<-data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% group_by(group.cluster) %>% summarize(group.cluster.mean=mean(value)) %>%  inner_join(
+    data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% dplyr::select("group.cluster","sampling_day","soil_trt","cluster.n","cluster"),by="group.cluster") %>%  dplyr::slice(rep(1:1440)[!duplicated(.$group.cluster)]) 
+# plot
+p15.any.trtlive<-  ggplot(data.sample,aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster))) + 
+  geom_point() + geom_hline(yintercept=0,color="red") + 
+  geom_line(data=data.group,aes(x=soil_trt,y=group.cluster.mean)) +
+  facet_grid(cluster.n~sampling_day) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
+  labs(title= "K-means clustering of two afternoon DEGs (live vs dead soil): fifteen clusters",color = "Cluster",y="scaled expression level") 
+p15.any.trtlive
+ggsave(p15.any.trtlive,file="../output/Twoafternoon.any.trtlive.DEG.Kmean.15clusters.png",width=11,height=15)
+```
+
+# GO ORA of each cluster
+```{r}
+# 8 Kmeans cluster
+temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread$transcript_ID, cluster=kClusters.any.trtlive.8) %>% split(.$cluster) %>% map(function(x) {GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(genelist=x$transcript_ID)})
+# convert list to data.frame
+temp %>% enframe(name="cluster") %>% unnest(value) %>% write_csv(path="../output/twoafternoon.any.trtsoil.DEG.Kmeans.8cluster.csv")
+
+# 15 Kmeans cluster
+temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread$transcript_ID, cluster=kClusters.any.trtlive.15) %>% split(.$cluster) %>% map(function(x) {GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(genelist=x$transcript_ID)})
+# convert list to data.frame
+temp %>% enframe(name="cluster") %>% unnest(value) %>% write_csv(path="../output/twoafternoon.any.trtsoil.DEG.Kmeans.15cluster.csv")
+
+```
+
+
+# Diurnal DEGS (3/4 days) clustering and cluster ORAs
+```{r}
+
+```
+
+# Diurnal DEGs (13/14 days) clustering and cluster ORAs
+```{r}
+
+```
+
 

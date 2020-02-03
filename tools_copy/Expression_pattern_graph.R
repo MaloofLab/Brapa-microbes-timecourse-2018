@@ -28,7 +28,7 @@ getwd()
 # loading DEG object created in "02_Normalize_DGE.Rmd"
 load("../output/timecourseDGE.Rdata")
 cpm.timecourse.v3.0 <- cpm(dge) %>% as_tibble() %>% bind_cols(data.frame(transcript_ID=rownames(dge$counts)),.)
-
+cpm.timecourse.v3.0.log <- cpm(dge,log=TRUE) %>% as_tibble() %>% bind_cols(data.frame(transcript_ID=rownames(dge$counts)),.)
 # sample files
 # # exp1 (20170617-samples)
 # sample.description.exp1<-readr::read_csv(file.path("..","v1.5annotation","20170617-samples","output","Br.mbio.e1.sample.description.csv"))
@@ -259,6 +259,33 @@ expression.pattern.Br.graph.timecourse.v3.0annotation.cpm<-function(data=cpm.tim
       theme(strip.text.y=element_text(angle=0),axis.text.x=element_text(angle=90)) +
       theme(legend.position="bottom") + labs(title=data.temp$target_id.FDR[1])
     p
+}
+
+# timecourse (under construction)
+expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2<-function(data=cpm.timecourse.v3.0,target.genes.FDR,sample.description=sample.description.timecourse,title=""){
+  #print(paste("data is",data[1:10,]))
+  #print(paste("tissue.type is root"))
+  
+  data[is.na(data)] <- 0 #
+  # select genes and add sample info
+  # data.temp<-data %>% filter(target_id %in% target.genes) %>% gather(sample,value,-target_id) %>%
+  #   inner_join(sample.description, by="sample") %>% filter(tissue==tissue.type)
+  # 
+  # using FDR
+  #target.genes.FDR <- target.genes.FDR #%>% slice(1)
+  data.temp<-data   %>%
+    filter(transcript_ID %in% target.genes$transcript_ID) %>% 
+    gather(sample,value,-transcript_ID) %>%
+    inner_join(sample.description, by="sample")
+  # needs to impove this
+  # ggplot(data.temp, aes(x=genotype,y=value))  + geom_jitter(alpha = 0.5,aes(colour=trt,shape=tissue) )  + theme_bw() + facet_grid(target_id~tissue,scales="free") + theme(strip.text.y=element_text(angle=0),axis.text.x=element_text(angle=90)) + theme(legend.position="bottom") + labs(title=title)
+  p<-data.temp %>% ggplot(aes(x=soil_trt,y=value))  + 
+    geom_jitter(alpha = 0.5,aes(colour=transcript_ID,shape=as.character(block)),width=0.2,size=3)  + 
+    theme_bw() +
+    facet_grid(sampling_day~sampling_time,scales="free") + 
+    theme(strip.text.y=element_text(angle=0),axis.text.x=element_text(angle=90)) +
+    theme(legend.position="bottom") + labs(title=data.temp$target_id.FDR[1])
+  p
 }
 
 # logFC timecourse
