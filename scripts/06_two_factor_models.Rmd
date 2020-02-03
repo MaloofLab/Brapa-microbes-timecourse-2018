@@ -150,7 +150,7 @@ twoafternoon.any.trtlive.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 2249
 
 
 
-# diurnal data. One analysis for day 3+4 and a separate analysis for days 13+14 
+# diurnal data. One analysis for day 3+4 and a separate analysis 
 
 ## Days 3 and 4
 ```{r}
@@ -235,7 +235,7 @@ Above asks for the interaction effects...what about trt on its own?
 dge.diurnal1314.trt.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),"soil_trtSBC_OLD")) ## all
 dge.diurnal1314.trt.DEGs.all <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-dge.diurnal1314.trt.DEGs <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.trt.DEGs) # 
+dge.diurnal1314.trt.DEGs <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.trt.DEGs) # 422
 ```
 
 Above asks for the interaction effects...what about time on its own?
@@ -277,7 +277,9 @@ return(temp)}
 twoafternoon.trtlive.DEGs.all.v3.0anno <- addAnno(twoafternoon.trtlive.DEGs.all)
 twoafternoon.any.trtlive.samplingday.lrt.DEGs.all.v3.0anno <- addAnno(twoafternoon.any.trtlive.samplingday.lrt.DEGs.all)
 twoafternoon.any.trtlive.DEGs.all.v3.0anno <- addAnno(twoafternoon.any.trtlive.DEGs.all)
-
+# 
+dge.diurnal34.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal34.time.DEGs.all)
+dge.diurnal1314.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal34.time.DEGs.all)
 ```
 
 # Session info
