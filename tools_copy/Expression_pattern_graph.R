@@ -262,19 +262,11 @@ expression.pattern.Br.graph.timecourse.v3.0annotation.cpm<-function(data=cpm.tim
 }
 
 # timecourse (under construction)
-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2<-function(data=cpm.timecourse.v3.0,target.genes.FDR,sample.description=sample.description.timecourse,title=""){
+expression.pattern.Br.graph.timecourse.v3.0annotation.cpm.2<-function(data=cpm.timecourse.v3.0,target.genes,sample.description=sample.description.timecourse,title=""){
   #print(paste("data is",data[1:10,]))
   #print(paste("tissue.type is root"))
-  
   data[is.na(data)] <- 0 #
-  # select genes and add sample info
-  # data.temp<-data %>% filter(target_id %in% target.genes) %>% gather(sample,value,-target_id) %>%
-  #   inner_join(sample.description, by="sample") %>% filter(tissue==tissue.type)
-  # 
-  # using FDR
-  #target.genes.FDR <- target.genes.FDR #%>% slice(1)
-  data.temp<-data   %>%
-    filter(transcript_ID %in% target.genes$transcript_ID) %>% 
+  data.temp<-data %>% dplyr::filter(transcript_ID %in% target.genes$transcript_ID) %>% 
     gather(sample,value,-transcript_ID) %>%
     inner_join(sample.description, by="sample")
   # needs to impove this

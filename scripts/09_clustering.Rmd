@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE,error=TRUE)
 #library(d3heatmap)
 library(edgeR);library(tidyverse)
 library(readr);library(readxl)
-library(stringr)
+library(stringr);library(glue)
 # read functions for expression graph
 source("../tools_copy/Expression_pattern_graph.R")
 # filtering for selecting only expressed genes
@@ -34,10 +34,10 @@ dim(cpm.timecourse.v3.0.log) #[1] 27308   289
 ```{r}
 twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.trtlive.DEGs.all.v3.0anno.csv"))
 twoafternoon.any.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.any.trtlive.DEGs.all.v3.0anno.csv"))
-dge.diurnal34.time.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal34.time.DEGs.all.v3.0anno.csv"))
-dge.diurnal1314.time.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal1314.time.DEGs.all.v3.0anno.csv"))
+diurnal34.time.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal34.time.DEGs.all.v3.0anno.csv"))
+diurnal1314.time.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal1314.time.DEGs.all.v3.0anno.csv"))
 # check
-dge.diurnal1314.time.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dim() # [1] 6892   13
+diurnal1314.time.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dim() # [1] 12080    13
 
 ```
 # format data
@@ -405,13 +405,14 @@ expression.pattern.Br.graph.timecourse.v3.0annotation.logFC(target.genes=gene.up
 
 
 # J meeting (Jan 28, 2020)
+
 * Maybe focusing on 2-afternoon genes to eliminate diurnal effects
 * expression pattern 
-** 1. logFC (live vs dead)
-** 2. plot eigengenes
-** 3. plot x= days
-** 4. patterns within DEGs by K-means or others (SOM, etc) to answer DEGS are mixtures or not. (combined with 1. and 3.)
-** 5. Using map2
++ 1. logFC (live vs dead)
++ 2. plot eigengenes
++ 3. plot x= days
++ 4. patterns within DEGs by K-means or others (SOM, etc) to answer DEGS are mixtures or not. (combined with 1. and 3.)
++ 5. Using map2
 
 # K-means clustering
 * Reference: https://2-bitbio.com/2017/10/clustering-rnaseq-data-using-k-means.html
@@ -450,7 +451,7 @@ kClustcentroids.8 <- sapply(levels(factor(kClusters.8)), clust.centroid, cpm.tim
 ```
 # Plotting the centroids to see how they behave: tidyverse version
 ```{r}
-library(glue)
+
 # adding sample description to data
   data.sample<-kClustcentroids.8 %>% as_tibble(rownames="sample") %>% 
   gather(cluster,value,-1) %>% 
@@ -525,7 +526,7 @@ dim(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread) # [1] 1474  97
 # calculate wss
 wss.logFC <- (nrow(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1])-1)*sum(apply(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1],2,var))
 for (i in 2:20) wss.logFC[i] <- sum(kmeans(cpm.timecourse.v3.0.logFC.twoafternoon.DEG.spread[,-1],
-                                     centers=i,iter.max = 10)$withinss,iter.max=20) # If default iter.max=10 gave me "did not converge in 10 iterations" error. Solution: https://r.789695.n4.nabble.com/kmeans-quot-did-not-converge-in-10-iterations-quot-td797019.html.
+                                     centers=i,iter.max = 20)$withinss) # If default iter.max=10 gave me "did not converge in 10 iterations" error. Solution: https://r.789695.n4.nabble.com/kmeans-quot-did-not-converge-in-10-iterations-quot-td797019.html.
 plot(1:20, wss.logFC, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
 
 ```
@@ -704,11 +705,11 @@ Now we can calculate the cluster ‘cores’ aka centroids:
 # find centroid in cluster 
 ```{r}
 kClustcentroids.any.trtlive.5 <- sapply(levels(factor(kClusters.any.trtlive.5)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1], kClusters.any.trtlive.5)
-kClustcentroids.any.trtlive.5
+kClustcentroids.any.trtlive.5 %>% head()
 ```
 # Plotting the centroids to see how they behave: tidyverse version
 ```{r}
-library(glue)
+
 # adding sample description to data
   data.sample<-kClustcentroids.any.trtlive.5 %>% as_tibble(rownames="sample") %>% 
   gather(cluster,value,-1) %>% 
@@ -748,11 +749,11 @@ Now we can calculate the cluster ‘cores’ aka centroids:
 # find centroid in cluster 
 ```{r}
 kClustcentroids.any.trtlive.6 <- sapply(levels(factor(kClusters.any.trtlive.6)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1], kClusters.any.trtlive.6)
-kClustcentroids.any.trtlive.6
+kClustcentroids.any.trtlive.6 %>% head()
 ```
 # Plotting the centroids to see how they behave: tidyverse version
 ```{r}
-library(glue)
+
 # adding sample description to data
   data.sample<-kClustcentroids.any.trtlive.6 %>% as_tibble(rownames="sample") %>% 
   gather(cluster,value,-1) %>% 
@@ -796,11 +797,10 @@ clust.centroid = function(i, dat, clusters) {
 }
 
 kClustcentroids.any.trtlive.8 <- sapply(levels(factor(kClusters.any.trtlive.8)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1], kClusters.any.trtlive.8)
-kClustcentroids.any.trtlive.8
+kClustcentroids.any.trtlive.8 %>% head()
 ```
 # Plotting the centroids to see how they behave: tidyverse version
 ```{r}
-library(glue)
 # adding sample description to data
   data.sample<-kClustcentroids.any.trtlive.8 %>% as_tibble(rownames="sample") %>% 
   gather(cluster,value,-1) %>% 
@@ -841,11 +841,10 @@ clust.centroid = function(i, dat, clusters) {
 }
 
 kClustcentroids.any.trtlive.15 <- sapply(levels(factor(kClusters.any.trtlive.15)), clust.centroid, cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread[,-1], kClusters.any.trtlive.15)
-kClustcentroids.any.trtlive.15
+kClustcentroids.any.trtlive.15 %>% head()
 ```
 # Plotting the centroids to see how they behave: tidyverse version
 ```{r}
-library(glue)
 # adding sample description to data
   data.sample<-kClustcentroids.any.trtlive.15 %>% as_tibble(rownames="sample") %>% 
   gather(cluster,value,-1) %>% 
@@ -897,7 +896,7 @@ temp <- tibble(transcript_ID=cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.
   nest(transcripts=transcript_ID) %>%
   mutate(GO_result = map(transcripts, ~ GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(pull(.)))) # learn "~" for calling function in map
 # using unnest()
-temp %>% unnest(GO_result) %>% write_csv(path="../output/twoafternoon.any.trtsoil.DEG.Kmeans.15cluster.csv") # I like this way to have target genes in one data.frame
+temp %>% unnest(GO_result) %>% write_csv(path="../output/twoafternoon.any.trtsoil.DEG.Kmeans.8cluster.csv") # I like this way to have target genes in one data.frame
 # 15 Kmeans cluster
 temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DEG.spread$transcript_ID, cluster=kClusters.any.trtlive.15) %>% 
   group_by(cluster) %>%
@@ -907,21 +906,124 @@ temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.twoafternoon.any.trtlive.DE
 temp %>% unnest(GO_result)  %>% write_csv(path="../output/twoafternoon.any.trtsoil.DEG.Kmeans.15cluster.csv")
 ```
 
-####### under construction ###
 # Diurnal DEGS (3/4 days) clustering and cluster ORAs
 ```{r}
-dge.diurnal1314.time.DEGs.all.v3.0anno 
+diurnal34.time.DEGs.all.v3.0anno 
 ```
 
 ```{r}
-# 2_afternoon DEG expression data (scaled)
-cpm.timecourse.v3.0.scale.diurnal1314.time.DEG<-cpm.timecourse.v3.0.scale %>% dplyr::select(-cv) %>% 
-  inner_join(dge.diurnal1314.time.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dplyr::select(genes),by=c(transcript_ID="genes")) %>%
+# scaling expression data
+cpm.timecourse.v3.0.scale<-t(scale(t(cpm.timecourse.v3.0[,-1]))) %>% as_tibble() %>% bind_cols(data.frame(transcript_ID=cpm.timecourse.v3.0$transcript_ID[]),.)
+
+# diurnal 3and4 days DEG expression data (scaled)
+cpm.timecourse.v3.0.scale.diurnal34.time.DEG<-cpm.timecourse.v3.0.scale  %>% 
+  inner_join(diurnal34.time.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dplyr::select(genes),by=c(transcript_ID="genes")) %>%
 gather(sample,value,-1) %>% inner_join(sample.description.timecourse,by="sample") %>% filter(sampling_day %in% c("03","04")) #[1] 6774  121
+with(cpm.timecourse.v3.0.scale.diurnal34.time.DEG,table(sampling_day,sample)) # OK
+# spread"
+cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread<-cpm.timecourse.v3.0.scale.diurnal34.time.DEG %>% dplyr::select(transcript_ID,sample,value) %>% spread(sample,value,-1)
+dim(cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread) # [1] 6774  121
+# calculate wss
+wss <- (nrow(cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread[,-1])-1)*sum(apply(cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread[,-1],2,var))
+for (i in 2:30) wss[i] <- sum(kmeans(cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread[,-1],
+                                     centers=i,iter.max = 20)$withinss) # If default iter.max=10 gave me "did not converge in 10 iterations" error. Solution: https://r.789695.n4.nabble.com/kmeans-quot-did-not-converge-in-10-iterations-quot-td797019.html.
+plot(1:30, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+
+Let’s perform the actual clsutering using K=6:
+```{r}
+set.seed(20)
+kClust.diurnal34.time.6 <- kmeans(cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread[,-1], centers=6, nstart = 1000, iter.max = 20)
+kClusters.diurnal34.time.6 <- kClust.diurnal34.time.6$cluster
+# number of clusters
+cluster.diurnal34.time.6.num<-tibble(cluster=kClusters.diurnal34.time.6) %>% group_by(cluster) %>% summarize(n=n()) 
+cluster.diurnal34.time.6.num$cluster<-as.character(cluster.diurnal34.time.6.num$cluster) # classic way
+cluster.diurnal34.time.6.num
+```
+Now we can calculate the cluster ‘cores’ aka centroids:
+# function to find centroid in cluster i
+```{r}
+kClustcentroids.diurnal34.time.6 <- sapply(levels(factor(kClusters.diurnal34.time.6)), clust.centroid, cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread[,-1], kClusters.diurnal34.time.6)
+kClustcentroids.diurnal34.time.6 %>% head()
+```
+# Plotting the centroids to see how they behave: tidyverse version
+```{r}
+# adding sample description to data
+  data.sample<-kClustcentroids.diurnal34.time.6 %>% as_tibble(rownames="sample") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse,by="sample") %>% 
+  inner_join(cluster.diurnal34.time.6.num,by="cluster") %>%
+    mutate(cluster.n=glue::glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) )
+# data.group for adding group cluster mean
+  data.group<-data.sample %>% unite("sampling_time.soil.cluster", c("sampling_time","soil_trt","cluster"),remove=FALSE) %>% group_by(sampling_time.soil.cluster) %>% summarize(sampling_time.soil.cluster.mean=mean(value)) %>%  inner_join(
+    data.sample %>% unite("sampling_time.soil.cluster", c("sampling_time","soil_trt","cluster"),remove=FALSE) %>% dplyr::select("sampling_time.soil.cluster","sampling_time","sampling_day","soil_trt","cluster.n","cluster"),by="sampling_time.soil.cluster") %>%  dplyr::slice(rep(1:1800)[!duplicated(.$sampling_time.soil.cluster)]) 
+# plot
+p6.diurnal34.time<-  ggplot(data.sample,aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster),shape=sampling_day)) + 
+  geom_jitter(alpha=0.5,width=0.25) + geom_hline(yintercept=0,color="red") + 
+  geom_line(data=data.group,aes(x=soil_trt,y=sampling_time.soil.cluster.mean)) +
+  facet_grid(cluster.n~sampling_time,scales="free") + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0),legend.position="none")+
+  labs(title= "K-means clustering of diurnal DEGs (day 3 and 4): six clusters",color = "Cluster",y="scaled expression level") 
+p6.diurnal34.time
+ggsave(p6.diurnal34.time,file="../output/diurnal34.time.DEG.Kmean.6clusters.png",width=11,height=6)
+```
+Let’s perform the actual clsutering using K=15:
+```{r}
+set.seed(20)
+kClust.diurnal34.time.15 <- kmeans(cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread[,-1], centers=15, nstart = 1000, iter.max = 20)
+kClusters.diurnal34.time.15 <- kClust.diurnal34.time.15$cluster
+# number of clusters
+cluster.diurnal34.time.15.num<-tibble(cluster=kClusters.diurnal34.time.15) %>% group_by(cluster) %>% summarize(n=n()) 
+cluster.diurnal34.time.15.num$cluster<-as.character(cluster.diurnal34.time.15.num$cluster) # classic way
+cluster.diurnal34.time.15.num
+```
+Now we can calculate the cluster ‘cores’ aka centroids:
+# function to find centroid in cluster i
+```{r}
+kClustcentroids.diurnal34.time.15 <- sapply(levels(factor(kClusters.diurnal34.time.15)), clust.centroid, cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread[,-1], kClusters.diurnal34.time.15)
+kClustcentroids.diurnal34.time.15 %>% head()
+```
+# Plotting the centroids to see how they behave: tidyverse version
+```{r}
+# adding sample description to data
+  data.sample<-kClustcentroids.diurnal34.time.15 %>% as_tibble(rownames="sample") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse,by="sample") %>% 
+  inner_join(cluster.diurnal34.time.15.num,by="cluster") %>%
+    mutate(cluster.n=glue::glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) )
+# data.group for adding group cluster mean
+  data.group<-data.sample %>% unite("sampling_time.soil.cluster", c("sampling_time","soil_trt","cluster"),remove=FALSE) %>% group_by(sampling_time.soil.cluster) %>% summarize(sampling_time.soil.cluster.mean=mean(value)) %>%  inner_join(
+    data.sample %>% unite("sampling_time.soil.cluster", c("sampling_time","soil_trt","cluster"),remove=FALSE) %>% dplyr::select("sampling_time.soil.cluster","sampling_time","sampling_day","soil_trt","cluster.n","cluster"),by="sampling_time.soil.cluster") %>%  dplyr::slice(rep(1:1800)[!duplicated(.$sampling_time.soil.cluster)]) 
+# plot
+p15.diurnal34.time<-  ggplot(data.sample,aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster),shape=sampling_day)) + 
+  geom_jitter(alpha=0.2) + geom_hline(yintercept=0,color="red") + 
+  geom_line(data=data.group,aes(x=soil_trt,y=sampling_time.soil.cluster.mean)) +
+  facet_grid(cluster.n~sampling_time,scales="free") + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0),legend.position="none")+
+  labs(title= "K-means clustering of diurnal DEGs (day 3 and 4): fifteen clusters",color = "Cluster",y="scaled expression level") 
+p15.diurnal34.time
+ggsave(p15.diurnal34.time,file="../output/diurnal34.time.DEG.Kmean.15clusters.png",width=11,height=15)
+```
+
+# Diurnal DEGS (13/14 days) clustering and cluster ORAs
+```{r}
+diurnal1314.time.DEGs.all.v3.0anno 
+```
+
+```{r}
+# scaling expression data
+cpm.timecourse.v3.0.scale
+# diurnal 3and4 days DEG expression data (scaled)
+cpm.timecourse.v3.0.scale.diurnal1314.time.DEG<-cpm.timecourse.v3.0.scale  %>% 
+  inner_join(diurnal1314.time.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dplyr::select(genes),by=c(transcript_ID="genes")) %>%
+gather(sample,value,-1) %>% inner_join(sample.description.timecourse,by="sample") %>% filter(sampling_day %in% c("13","14")) #[1] 11886  121
 with(cpm.timecourse.v3.0.scale.diurnal1314.time.DEG,table(sampling_day,sample)) # OK
 # spread"
 cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread<-cpm.timecourse.v3.0.scale.diurnal1314.time.DEG %>% dplyr::select(transcript_ID,sample,value) %>% spread(sample,value,-1)
-dim(cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread) # [1] 6774  121
+dim(cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread) # [1] 11886  121
 # calculate wss
 wss <- (nrow(cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread[,-1])-1)*sum(apply(cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread[,-1],2,var))
 for (i in 2:30) wss[i] <- sum(kmeans(cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread[,-1],
@@ -930,6 +1032,44 @@ plot(1:30, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of 
 ```
 
 
+Let’s perform the actual clsutering using K=6:
+```{r}
+set.seed(20)
+kClust.diurnal1314.time.6 <- kmeans(cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread[,-1], centers=6, nstart = 1000, iter.max = 20)
+kClusters.diurnal1314.time.6 <- kClust.diurnal1314.time.6$cluster
+# number of clusters
+cluster.diurnal1314.time.6.num<-tibble(cluster=kClusters.diurnal1314.time.6) %>% group_by(cluster) %>% summarize(n=n()) 
+cluster.diurnal1314.time.6.num$cluster<-as.character(cluster.diurnal1314.time.6.num$cluster) # classic way
+cluster.diurnal1314.time.6.num
+```
+Now we can calculate the cluster ‘cores’ aka centroids:
+# function to find centroid in cluster i
+```{r}
+kClustcentroids.diurnal1314.time.6 <- sapply(levels(factor(kClusters.diurnal1314.time.6)), clust.centroid, cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread[,-1], kClusters.diurnal1314.time.6)
+kClustcentroids.diurnal1314.time.6 %>% head()
+```
+# Plotting the centroids to see how they behave: tidyverse version
+```{r}
+# adding sample description to data
+  data.sample<-kClustcentroids.diurnal1314.time.6 %>% as_tibble(rownames="sample") %>% 
+  gather(cluster,value,-1) %>% 
+  inner_join(sample.description.timecourse,by="sample") %>% 
+  inner_join(cluster.diurnal1314.time.6.num,by="cluster") %>%
+    mutate(cluster.n=glue::glue('{cluster2} \n({n2})',
+                          cluster2=cluster,
+                          n2=n) )
+# data.group for adding group cluster mean
+  data.group<-data.sample %>% unite("sampling_time.soil.cluster", c("sampling_time","soil_trt","cluster"),remove=FALSE) %>% group_by(sampling_time.soil.cluster) %>% summarize(sampling_time.soil.cluster.mean=mean(value)) %>%  inner_join(
+    data.sample %>% unite("sampling_time.soil.cluster", c("sampling_time","soil_trt","cluster"),remove=FALSE) %>% dplyr::select("sampling_time.soil.cluster","sampling_time","sampling_day","soil_trt","cluster.n","cluster"),by="sampling_time.soil.cluster") %>%  dplyr::slice(rep(1:1800)[!duplicated(.$sampling_time.soil.cluster)]) 
+# plot
+p6.diurnal1314.time<-  ggplot(data.sample,aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster),shape=sampling_day)) + 
+  geom_jitter(alpha=0.5,width=0.25) + geom_hline(yintercept=0,color="red") + 
+  geom_line(data=data.group,aes(x=soil_trt,y=sampling_time.soil.cluster.mean)) +
+  facet_grid(cluster.n~sampling_time,scales="free") + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0),legend.position="none")+
+  labs(title= "K-means clustering of diurnal DEGs (day 13 and 14): six clusters",color = "Cluster",y="scaled expression level") 
+p6.diurnal1314.time
+ggsave(p6.diurnal1314.time,file="../output/diurnal1314.time.DEG.Kmean.6clusters.png",width=11,height=6) # 15 clusters... why????
+```
 Let’s perform the actual clsutering using K=15:
 ```{r}
 set.seed(20)
@@ -943,43 +1083,64 @@ cluster.diurnal1314.time.15.num
 Now we can calculate the cluster ‘cores’ aka centroids:
 # function to find centroid in cluster i
 ```{r}
-clust.centroid = function(i, dat, clusters) {
-  ind = (clusters == i)
-  colMeans(dat[ind,])
-}
-
 kClustcentroids.diurnal1314.time.15 <- sapply(levels(factor(kClusters.diurnal1314.time.15)), clust.centroid, cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread[,-1], kClusters.diurnal1314.time.15)
-kClustcentroids.diurnal1314.time.15
+kClustcentroids.diurnal1314.time.15 %>% head()
 ```
 # Plotting the centroids to see how they behave: tidyverse version
 ```{r}
-library(glue)
 # adding sample description to data
   data.sample<-kClustcentroids.diurnal1314.time.15 %>% as_tibble(rownames="sample") %>% 
   gather(cluster,value,-1) %>% 
   inner_join(sample.description.timecourse,by="sample") %>% 
   inner_join(cluster.diurnal1314.time.15.num,by="cluster") %>%
-    mutate(cluster.n=glue('{cluster2} \n({n2})',
+    mutate(cluster.n=glue::glue('{cluster2} \n({n2})',
                           cluster2=cluster,
                           n2=n) )
 # data.group for adding group cluster mean
-  data.group<-data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% group_by(group.cluster) %>% summarize(group.cluster.mean=mean(value)) %>%  inner_join(
-    data.sample %>% unite("group.cluster", c("group","cluster"),remove=FALSE) %>% dplyr::select("group.cluster","sampling_day","soil_trt","cluster.n","cluster"),by="group.cluster") %>%  dplyr::slice(rep(1:1440)[!duplicated(.$group.cluster)]) 
+  data.group<-data.sample %>% unite("sampling_time.soil.cluster", c("sampling_time","soil_trt","cluster"),remove=FALSE) %>% group_by(sampling_time.soil.cluster) %>% summarize(sampling_time.soil.cluster.mean=mean(value)) %>%  inner_join(
+    data.sample %>% unite("sampling_time.soil.cluster", c("sampling_time","soil_trt","cluster"),remove=FALSE) %>% dplyr::select("sampling_time.soil.cluster","sampling_time","sampling_day","soil_trt","cluster.n","cluster"),by="sampling_time.soil.cluster") %>%  dplyr::slice(rep(1:1800)[!duplicated(.$sampling_time.soil.cluster)]) 
 # plot
-p15.diurnal1314.time<-  ggplot(data.sample,aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster))) + 
-  geom_point() + geom_hline(yintercept=0,color="red") + 
-  geom_line(data=data.group,aes(x=soil_trt,y=group.cluster.mean)) +
-  facet_grid(cluster.n~sampling_day) + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0))+
-  labs(title= "K-means clustering of diurnal DEGs (day 3 and 4): fifteen clusters",color = "Cluster",y="scaled expression level") 
+p15.diurnal1314.time<-  ggplot(data.sample,aes(x=soil_trt,y=value, group=cluster, colour=as.factor(cluster),shape=sampling_day)) + 
+  geom_jitter(alpha=0.2) + geom_hline(yintercept=0,color="red") + 
+  geom_line(data=data.group,aes(x=soil_trt,y=sampling_time.soil.cluster.mean)) +
+  facet_grid(cluster.n~sampling_time,scales="free") + theme(axis.text=element_text(angle=90),strip.text.y=element_text(angle=0),legend.position="none")+
+  labs(title= "K-means clustering of diurnal DEGs (day 13 and 14): fifteen clusters",color = "Cluster",y="scaled expression level") 
 p15.diurnal1314.time
 ggsave(p15.diurnal1314.time,file="../output/diurnal1314.time.DEG.Kmean.15clusters.png",width=11,height=15)
 ```
 
-
-
-# Diurnal DEGs (13/14 days) clustering and cluster ORAs
+# GO ORA under construction (day 3/4)
 ```{r}
-dge.diurnal1314.time.DEGs.all.v3.0anno
+# 6 Kmeans cluster
+temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread$transcript_ID, cluster=kClusters.diurnal34.time.6) %>% 
+  group_by(cluster) %>%
+  nest(transcripts=transcript_ID) %>%
+  mutate(GO_result = map(transcripts, ~ GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(pull(.)))) 
+# using unnest()
+temp %>% unnest(GO_result)  %>% write_csv(path="../output/diurnal34.time.DEG.Kmeans.6cluster.csv.gz")
+# 15 Kmeans cluster
+temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.diurnal34.time.DEG.spread$transcript_ID, cluster=kClusters.diurnal34.time.15) %>% 
+  group_by(cluster) %>%
+  nest(transcripts=transcript_ID) %>%
+  mutate(GO_result = map(transcripts, ~ GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(pull(.)))) 
+# using unnest()
+temp %>% unnest(GO_result)  %>% write_csv(path="../output/diurnal34.time.DEG.Kmeans.15cluster.csv.gz")
 ```
 
-
+# GO ORA under construction (day 13/14)
+```{r}
+# 6 Kmeans cluster
+temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread$transcript_ID, cluster=kClusters.diurnal1314.time.6) %>% 
+  group_by(cluster) %>%
+  nest(transcripts=transcript_ID) %>%
+  mutate(GO_result = map(transcripts, ~ GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(pull(.)))) 
+# using unnest()
+temp %>% unnest(GO_result)  %>% write_csv(path="../output/diurnal1314.time.DEG.Kmeans.6cluster.csv.gz")
+# 15 Kmeans cluster
+temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.diurnal1314.time.DEG.spread$transcript_ID, cluster=kClusters.diurnal1314.time.15) %>% 
+  group_by(cluster) %>%
+  nest(transcripts=transcript_ID) %>%
+  mutate(GO_result = map(transcripts, ~ GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(pull(.)))) 
+# using unnest()
+temp %>% unnest(GO_result)  %>% write_csv(path="../output/diurnal1314.time.DEG.Kmeans.15cluster.csv.gz")
+```
