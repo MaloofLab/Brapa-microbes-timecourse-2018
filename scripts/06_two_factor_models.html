@@ -1779,8 +1779,8 @@ twoafternoon.any.trtlive.DEGs.all %&gt;% filter(FDR&lt;0.05) %&gt;% summarize(n(
   </script>
 </div>
 </div>
-<div id="diurnal-data.-one-analysis-for-day-34-and-a-separate-analysis-for-days-1314" class="section level1">
-<h1>diurnal data. One analysis for day 3+4 and a separate analysis for days 13+14</h1>
+<div id="diurnal-data.-one-analysis-for-day-34-and-a-separate-analysis" class="section level1">
+<h1>diurnal data. One analysis for day 3+4 and a separate analysis</h1>
 <div id="days-3-and-4" class="section level2">
 <h2>Days 3 and 4</h2>
 <pre class="r"><code># subset data
@@ -1895,7 +1895,7 @@ dge.diurnal1314.anytime.DEGs &lt;- topTags(dge.diurnal1314.anytime.lrt,n = Inf,p
 dge.diurnal1314.trt.lrt &lt;- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),&quot;soil_trtSBC_OLD&quot;)) ## all
 dge.diurnal1314.trt.DEGs.all &lt;- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 1)$table
 ## pvalue &lt; 0.05
-dge.diurnal1314.trt.DEGs &lt;- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.trt.DEGs) # </code></pre>
+dge.diurnal1314.trt.DEGs &lt;- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.trt.DEGs) # 422</code></pre>
 <pre><code>## [1] 422</code></pre>
 <p>Above asks for the interaction effects…what about time on its own?</p>
 <pre class="r"><code># get DEGs, time
@@ -1958,6 +1958,11 @@ twoafternoon.trtlive.DEGs.all.v3.0anno &lt;- addAnno(twoafternoon.trtlive.DEGs.a
 <pre><code>## [1] &quot;twoafternoon.any.trtlive.samplingday.lrt.DEGs.all&quot;</code></pre>
 <pre class="r"><code>twoafternoon.any.trtlive.DEGs.all.v3.0anno &lt;- addAnno(twoafternoon.any.trtlive.DEGs.all)</code></pre>
 <pre><code>## [1] &quot;twoafternoon.any.trtlive.DEGs.all&quot;</code></pre>
+<pre class="r"><code># 
+dge.diurnal34.time.DEGs.all.v3.0anno&lt;-addAnno(dge.diurnal34.time.DEGs.all)</code></pre>
+<pre><code>## [1] &quot;dge.diurnal34.time.DEGs.all&quot;</code></pre>
+<pre class="r"><code>dge.diurnal1314.time.DEGs.all.v3.0anno&lt;-addAnno(dge.diurnal1314.time.DEGs.all)</code></pre>
+<pre><code>## [1] &quot;dge.diurnal1314.time.DEGs.all&quot;</code></pre>
 </div>
 </div>
 <div id="session-info" class="section level1">

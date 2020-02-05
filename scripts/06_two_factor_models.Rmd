@@ -279,7 +279,7 @@ twoafternoon.any.trtlive.samplingday.lrt.DEGs.all.v3.0anno <- addAnno(twoafterno
 twoafternoon.any.trtlive.DEGs.all.v3.0anno <- addAnno(twoafternoon.any.trtlive.DEGs.all)
 # 
 dge.diurnal34.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal34.time.DEGs.all)
-dge.diurnal1314.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal34.time.DEGs.all)
+dge.diurnal1314.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal1314.time.DEGs.all)
 ```
 
 # Session info
