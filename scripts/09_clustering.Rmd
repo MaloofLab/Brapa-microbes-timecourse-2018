@@ -61,7 +61,7 @@ sum(as.integer(cpm.timecourse.v3.0$cv>30))/dim(cpm.timecourse.v3.0)[1] # [1] 0.5
 sum(as.integer(cpm.timecourse.v3.0$cv>40))/dim(cpm.timecourse.v3.0)[1] # [1] 0.3725282. Larger CV than SAS timecourse data ()??? Due to non log absolute expression value.
 # cf. sum(as.integer(SAS.expression.vst.s.kazu$cv>4.5))/dim(SAS.expression.vst.s.kazu)[1] #[1] 0.2300789
 ```
-# use lon transformed data
+# use log transformed data
 ```{r}
 cpm.timecourse.v3.0.log$cv<-co.var.df(cpm.timecourse.v3.0.log[,-1])
 b<-hist(cpm.timecourse.v3.0.log$cv)
