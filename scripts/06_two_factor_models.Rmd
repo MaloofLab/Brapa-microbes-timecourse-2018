@@ -4,7 +4,7 @@ output:
   html_document:
     df_print: paged
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -148,7 +148,14 @@ twoafternoon.any.trtlive.DEGs.all <- topTags(twoafternoon.any.trtlive.lrt,n = In
 twoafternoon.any.trtlive.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 2249
 ```
 
-
+ get DEGs day effects only
+```{r}
+twoafternoon.any.trtlive.lrt <- glmLRT(dge.twoafternoon.fit,coef = str_which(colnames(dge.twoafternoon.design),"^sampling"))
+## all
+twoafternoon.any.trtlive.DEGs.all <- topTags(twoafternoon.any.trtlive.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+twoafternoon.any.trtlive.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 15376
+```
 
 # diurnal data. One analysis for day 3+4 and a separate analysis 
 
@@ -177,10 +184,20 @@ dge.diurnal34.fit <- glmFit(dge.diurnal34,dge.diurnal34.design)
 dge.diurnal34.anytime.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),":")) ## all
 dge.diurnal34.anytime.DEGs.all <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-dge.diurnal34.anytime.DEGs <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.anytime.DEGs) # 1???? something is wrong???
+dge.diurnal34.anytime.DEGs <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.anytime.DEGs) # 4???? something is wrong???
 ```
 
-Above asks for the interaction effects...what about trt on its own?
+trt only
+
+```{r}
+# get DEGs, trt
+dge.diurnal34.trt.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"^soil_trtSBC_OLD$")) ## all
+dge.diurnal34.trt.DEGs.all <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+dge.diurnal34.trt.DEGs <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.trt.DEGs) # 4593
+```
+
+What about trt + trt:interaction
 ```{r}
 # get DEGs, trt
 dge.diurnal34.trt.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"soil_trtSBC_OLD")) ## all
@@ -228,8 +245,16 @@ dge.diurnal1314.anytime.DEGs.all <- topTags(dge.diurnal1314.anytime.lrt,n = Inf,
 dge.diurnal1314.anytime.DEGs <- topTags(dge.diurnal1314.anytime.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.anytime.DEGs) # 1???? something is wrong???
 
 ```
+trt only
+```{r}
+# get DEGs, trt
+dge.diurnal1314.trt.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),"soil_trtSBC_OLD$")) ## all
+dge.diurnal1314.trt.DEGs.all <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 1)$table
+## pvalue < 0.05
+dge.diurnal1314.trt.DEGs <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.trt.DEGs) # 
+```
 
-Above asks for the interaction effects...what about trt on its own?
+What about trt + trt:time?
 ```{r}
 # get DEGs, trt
 dge.diurnal1314.trt.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),"soil_trtSBC_OLD")) ## all
