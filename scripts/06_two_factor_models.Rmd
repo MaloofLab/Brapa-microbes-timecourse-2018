@@ -186,7 +186,7 @@ Above asks for the interaction effects...what about trt on its own?
 dge.diurnal34.trt.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"soil_trtSBC_OLD")) ## all
 dge.diurnal34.trt.DEGs.all <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-dge.diurnal34.trt.DEGs <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.trt.DEGs) # 
+dge.diurnal34.trt.DEGs <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.trt.DEGs) # 4593
 ```
 
 Above asks for the interaction effects...what about time on its own?
@@ -280,6 +280,10 @@ twoafternoon.any.trtlive.DEGs.all.v3.0anno <- addAnno(twoafternoon.any.trtlive.D
 # 
 dge.diurnal34.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal34.time.DEGs.all)
 dge.diurnal1314.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal1314.time.DEGs.all)
+# adding trt
+dge.diurnal34.trt.DEGs.all.v3.0anno<-addAnno(dge.diurnal34.trt.DEGs.all)
+dge.diurnal1314.trt.DEGs.all.v3.0anno<-addAnno(dge.diurnal1314.trt.DEGs.all)
+
 ```
 
 # Session info
