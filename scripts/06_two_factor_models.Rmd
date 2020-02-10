@@ -186,6 +186,12 @@ dge.diurnal34.anytime.DEGs.all <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.va
 ## pvalue < 0.05
 dge.diurnal34.anytime.DEGs <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.anytime.DEGs) # 4???? something is wrong???
 ```
+BraA05g007030.3C: AT2G38640.1 Unknown
+BraA02g000300.3C: AT5G01210 HXXXD-type acyl-transferase family protein
+BraA06g008660: AT1G13110: cytochrome P450, family 71 subfamily B, polypeptide 7 
+(plastid located)
+BraA10g017550: AT5G59720: HeatShock Protein
+
 
 trt only
 
