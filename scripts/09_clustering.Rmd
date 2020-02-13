@@ -1152,3 +1152,9 @@ temp<-tibble(transcript_ID=cpm.timecourse.v3.0.scale.diurnal1314.trt.DEG.spread$
 # using unnest()
 temp %>% unnest(GO_result) %>% dplyr::select(-transcripts) %>% write_csv(path="../output/diurnal1314.trt.DEG.Kmeans.15cluster.csv.gz")
 ```
+
+# session info
+```{r}
+sessionInfo()
+```
+
