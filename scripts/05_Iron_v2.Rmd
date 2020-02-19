@@ -1,0 +1,198 @@
+---
+title: "iron v2 comprehensive"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+Initial comparison of timecourse DEGs and iron deficiency responsive genes used data from Kim (2019). This time more comprehensive data was collected and compared. 
+```{r setup, include=FALSE}
+#library(knitr)
+knitr::opts_chunk$set(echo = TRUE,error=TRUE)
+#library(d3heatmap)
+#library(flexdashboard)
+library(edgeR);library(tidyverse)
+library(readr);library(readxl)
+library(stringr)
+
+```
+
+# Kailasam (2019). RNAseq  E-MTAB-8157
+mapping
+```{r eval=FALSE}
+# working in fastq file directory
+# making directory for mapped 
+system("mkdir ../kallisto_sam_out2")
+# go to fastq file directory
+# reading fastq files (in fastq file directory)
+#fastqfiles<-list.files(pattern="fastq.gz")
+# fastq files with single end 
+# fastqfiles.SE<- fastqfiles %>% as_tibble() %>% separate(value,into=c("SRA","type","compress"),sep="\\.") %>% separate(SRA,into=c("SRA","pair"),sep="_") %>% group_by(SRA) %>%summarize(num=n()) %>% filter(num==1) %>% select(SRA) %>% as_vector()
+fastqfiles<-list.files(pattern="fastq.gz")
+#fastqfiles.title<-gsub("(ERR+)(\\_1|_2)(\\.fastq\\.qz)",//2,fastqfiles) # does not work
+#fastqfiles.title<-gsub("(ERR+)(_)(1|2)(.fastq.qz)","//1",fastqfiles)
+#gsub("(ERR+)(\\_)(1|2)(\\.fastq\\.qz)","//1",fastqfiles)
+#gsub("(ERR\\d+)(\\_)(1|2)","\\1","ERR3445475_1") # works
+#gsub("(ERR\\d+)(\\_)(1|2)(+)","\\1","ERR3445475_1.fastq.gz")
+#gsub("(ERR\\d+)(\\_)(1|2)(.fastq.gz)","\\1","ERR3445475_1.fastq.gz") # works
+fastqfiles.title<-gsub("(ERR\\d+)(\\_)(1|2)(.fastq.gz)","\\1",fastqfiles) # works
+system(paste("kallisto quant -i ../../references/TAIR10_cdna_20110103_representative_gene_model_updated_kallisto_index  -o ../kallisto_sam_out2/ ",fastqfiles)) # this is not what I want
+# manually write script
+system("kallisto quant -i ../../references/TAIR10_cdna_20110103_representative_gene_model_updated_kallisto_index  -o ../kallisto_sam_out2/ERR3445475/ ERR3445475_1.fastq.gz ERR3445475_2.fastq.gz")
+system("kallisto quant -i ../../references/TAIR10_cdna_20110103_representative_gene_model_updated_kallisto_index  -o ../kallisto_sam_out2/ERR3445476/ ERR3445476_1.fastq.gz ERR3445476_2.fastq.gz")
+system("kallisto quant -i ../../references/TAIR10_cdna_20110103_representative_gene_model_updated_kallisto_index  -o ../kallisto_sam_out2/ERR3445477/ ERR3445477_1.fastq.gz ERR3445477_2.fastq.gz")
+system("kallisto quant -i ../../references/TAIR10_cdna_20110103_representative_gene_model_updated_kallisto_index  -o ../kallisto_sam_out2/ERR3445478/ ERR3445478_1.fastq.gz ERR3445478_2.fastq.gz")
+
+# no bam files needed.       
+#setwd(paste("../kallisto_sam_out2/",x,sep=""))
+# system(paste("samtools sort *.bam -o ",x,".sorted.bam",sep=""))
+# system("samtools index *.sorted.bam")
+# setwd("../../Kailasam_2020_RNAseq")
+```
+
+# copy kallisto_sam_out2 directory in Whitney under input directory
+## get reads and create data frame
+```{r}
+files <- dir("../input/kallisto_Kailasam2019_out/", include.dirs = TRUE) # rename kallisto out folder
+files %>% head()
+```
+
+```{r}
+counts.list <- map(files, ~ read_tsv(
+  file=file.path("..","input","kallisto_Kailasam2019_out",.,"abundance.tsv"),
+  col_types = "cdddd"))
+names(counts.list) <- files
+```
+
+```{r}
+counts.Kailasam2019 <- sapply(counts.list, dplyr::select, est_counts) %>% 
+  bind_cols(counts.list[[1]][,"target_id"],.)
+counts.Kailasam2019[is.na(counts.Kailasam2019)] <- 0
+colnames(counts.Kailasam2019) <- sub(".est_counts","",colnames(counts.Kailasam2019),fixed = TRUE)
+counts.Kailasam2019
+```
+
+```{r}
+write_csv(counts.Kailasam2019,"../output/Kailasam2019_raw_counts.csv.gz")
+```
+
+```{r}
+counts2 <- counts.Kailasam2019 %>% 
+  as.data.frame() %>% 
+  column_to_rownames(var = "target_id") %>%
+  as.matrix() %>%
+  round(0)
+```
+# dge (under construction)
+```{r}
+dge <- DGEList(counts=counts2, 
+               samples=colnames(counts2), 
+               group=factor(rep(c("plusFe","minusFe"),each=2),levels=c("plusFe","minusFe"))
+                                )
+```
+
+# normalize
+
+```{r}
+dge <- calcNormFactors(dge)
+```
+# save
+```{r}
+save(dge, file="../output/Kailasam2019.Rdata")
+```
+# DEG
+```{r}
+group<-factor(rep(c("plusFe","minusFe"),each=2),levels=c("plusFe","minusFe"))
+design <- model.matrix(~group)
+y <- estimateDisp(dge,design)
+fit <- glmFit(y,design)
+lrt <- glmLRT(fit,coef=2)
+Fe_deficiency.Kailasam2019.DEGs.all<-topTags(lrt,n = Inf,p.value = 1)$table
+
+```
+# Adding annotation 
+```{r}
+#At.gene.name <-read_tsv("https://www.arabidopsis.org/download_files/Subscriber_Data_Releases/TAIR_Data_20180630/gene_aliases_20180702.txt.gz") # Does work from home when I use Pulse Secure.
+# At.gene.name <- 
+#read_tsv("https://www.arabidopsis.org/download_files/Public_Data_Releases/TAIR_Data_20181231/Araport11_functional_descriptions_20181231.txt.gz") # does not exist anymore
+# updated one (Jan 21, 2020)
+#At.gene.name<-read_tsv("https://www.arabidopsis.org/download_files/Subscriber_Data_Releases/TAIR_Data_20191231/gene_aliases_20191231.txt.gz") # download file and remove all "" with TextWrangler etc
+At.gene.name<-read_tsv(file.path("..","Annotation_copy","input","gene_aliases_20191231.txt")) 
+# combine redundant symbol
+At.gene.name <- At.gene.name %>% group_by(name) %>% summarise(symbol2=paste(symbol,collapse=";"),full_name=paste(full_name,collapse=";"))
+At.gene.name %>% dplyr::slice(100:110)
+At.gene.name %>% filter(name=="AT4G25350") # SHB1
+# add annotiona with full name objects (all)
+Fe_deficiency.Kailasam2019.DEGs.all.anno <- Fe_deficiency.Kailasam2019.DEGs.all %>% rownames_to_column(var="genes") %>% separate(genes,into=c("AGI","variant"),sep="\\.", remove=FALSE) %>% left_join(At.gene.name,by=c(AGI="name")) %>%  dplyr::select(AGI, logFC,logCPM,LR,PValue,FDR,symbol2, full_name)
+Fe_deficiency.Kailasam2019.DEGs.all.anno %>% dplyr::slice(1:100) # %>% View()
+# write csv (all)
+write.csv(Fe_deficiency.Kailasam2019.DEGs.all.anno,file=file.path("..","output","Fe_deficiency.Kailasam2019.DEGs.all.anno.csv"))
+```
+
+# Expression pattern
+```{r}
+load("../output/Kailasam2019.Rdata") 
+Fe_deficiency.Kailasam2019.DEGs.all.anno <- read_csv(file.path("..","output","Fe_deficiency.Kailasam2019.DEGs.all.anno.csv"))
+
+Fe_deficiency.Kailasam2019.cpm<-cpm(dge) %>% as_tibble() %>% bind_cols(data.frame(transcript_ID=rownames(dge$counts)),.) %>% separate(transcript_ID,into=c("AGI","variant"),remove=FALSE)
+sample.description.Fe_deficiency.Kailasam2019<-dge$samples %>% as_tibble() %>% dplyr::rename(sample=samples)
+
+expression.pattern.AT.graph.cpm<-function(data=Fe_deficiency.Kailasam2019.cpm,target.genes.FDR,sample.description=sample.description.Fe_deficiency.Kailasam2019,title=""){
+  data[is.na(data)] <- 0 #
+  # using FDR
+  data.temp<-data  %>% 
+    dplyr::rename(target_id=AGI) %>%
+    filter(target_id %in% target.genes.FDR$AGI) %>% dplyr::select(-transcript_ID,-variant) %>%
+    gather(sample,value,-target_id) %>%
+    inner_join(sample.description, by="sample")  %>%
+    right_join(target.genes.FDR[,c("AGI","FDR")], by=c("target_id"="AGI")) %>%
+    mutate(FDR=format(FDR,digits=2,scientific=TRUE)) %>%
+    unite(target_id.FDR,target_id,FDR,sep="\n FDR ") 
+  # print(data.temp)
+    p<-data.temp %>% ggplot(aes(x=group,y=value))  + 
+      geom_jitter(alpha = 0.5,aes(color=group))  + 
+      theme_bw() + facet_grid(target_id.FDR~.,scales="free") +
+      theme(strip.text.y=element_text(angle=0),axis.text.x=element_text(angle=90)) +
+      theme(legend.position="bottom") + labs(title="")
+    p
+}
+# expression pattern of upregulated genes upon Mn deficienty
+   gene.of.interest.FDR.up <- Fe_deficiency.Kailasam2019.DEGs.all.anno %>% filter(FDR< 0.0001,logFC>0) %>%
+     dplyr::select(AGI,logFC,FDR) %>% arrange(FDR)
+   print("logFC>0")
+expression.pattern.AT.graph.cpm(target.genes.FDR=gene.of.interest.FDR.up[1:5,])
+# down-regulated genes upon Mn deficienty
+   print("logFC<0")
+gene.of.interest.FDR.down <- Fe_deficiency.Kailasam2019.DEGs.all.anno %>% filter(FDR< 0.0001,logFC<0) %>%
+     dplyr::select(AGI,logFC,FDR) %>% arrange(FDR)
+expression.pattern.AT.graph.cpm(target.genes.FDR=gene.of.interest.FDR.down[1:5,])
+```
+
+get the iron data from Kim (2019) table S1
+```{r}
+Kim2019_TS1_iron <- read_excel("../input/pnas.1916892116.sd01.xlsx", sheet = "iron deficiency reponsive genes") %>%
+  select(GeneID=`Gene ID`, GeneSymbol=`Gene Symbol`, FC= `Fold Changes (-Fe/+Fe)`) %>%
+  mutate(Kim2019=log2(FC))
+Kim2019_TS1_iron
+```
+
+# comparison between Kim2019 and Kailasam2019
+```{r}
+# Kailasam 2019
+Fe_deficiency.Kailasam2019.DEGs.all.anno <- read_csv(file.path("..","output","Fe_deficiency.Kailasam2019.DEGs.all.anno.csv"))
+
+# Kim2019 my lmer analysis (Fe.Kim2019.fits.summary.FC)
+Fe.Kim2019.fits.summary.FC<-read_csv(file.path("..","input","Fe.Kim2019.fits.summary.FC.csv"))
+comparison.Fe<-Fe.Kim2019.fits.summary.FC %>% dplyr::select(locus,gt,FC) %>% mutate(Kim2019.Kazulmer=log(FC)) %>% filter(gt=="WT") %>% dplyr::select(locus,Kim2019.Kazulmer) %>% inner_join(Kim2019_TS1_iron %>% dplyr::select(GeneID,Kim2019),by=c("locus"="GeneID")) %>% full_join(Fe_deficiency.Kailasam2019.DEGs.all.anno %>% rename(Kailasam2019=logFC) %>% dplyr::select(AGI,Kailasam2019),by=c("locus"="AGI")) 
+library(GGally)
+comparison.Fe %>% ggpairs(columns=2:4,lower = list(continuous = wrap("points", alpha = 0.3)))
+```
+
+
+# Session info
+```{r}
+sessionInfo()
+```
+
