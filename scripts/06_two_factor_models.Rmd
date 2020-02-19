@@ -39,7 +39,7 @@ Each row has a subsetted dge that corresponds to that time point.
 ```{r}
 models <- tibble(day_time=unique(dge$samples$day_time))
 models <- models %>%
-    separate(day_time, into=c("day", "time"), sep="-", remove=FALSE) %>%
+  separate(day_time, into=c("day", "time"), sep="-", remove=FALSE) %>%
   mutate(dge=map(day_time, ~ dge[,dge$samples$day_time==.]))
 
 #Do NOT print the full models tibble to the screen, it slows everything way down!!
@@ -148,7 +148,7 @@ twoafternoon.any.trtlive.DEGs.all <- topTags(twoafternoon.any.trtlive.lrt,n = In
 twoafternoon.any.trtlive.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 2249
 ```
 
- get DEGs day effects only
+get DEGs day effects only
 ```{r}
 twoafternoon.any.trtlive.lrt <- glmLRT(dge.twoafternoon.fit,coef = str_which(colnames(dge.twoafternoon.design),"^sampling"))
 ## all
@@ -297,9 +297,15 @@ myfunc <- function(v1) {
 }
 myfunc(foo)
 # adding annotation and write_csv adding ".v3.0anno.csv" to the object name.
-addAnno<-function(DGE) {temp<-left_join(DGE %>% rownames_to_column(var="genes"),Br.v3.0anno.At.BLAST.highscore,by=c(genes="name")) %>%  dplyr::select(genes,names(DGE),AGI, At_symbol, At_short_description, perc_ID); print(deparse(substitute(DGE)));
-write_csv(temp, path=file.path("..","output",paste(deparse(substitute(DGE)),".v3.0anno.csv",sep="")));
-return(temp)} 
+addAnno <- function(DGE) {
+  temp <- DGE %>% 
+    rownames_to_column(var="genes") %>% 
+    left_join(Br.v3.0anno.At.BLAST.highscore,by=c(genes="name")) %>% 
+    dplyr::select(genes,names(DGE),AGI, At_symbol, At_short_description, perc_ID)
+  print(deparse(substitute(DGE)))
+  write_csv(temp, path=file.path("..","output",paste(deparse(substitute(DGE)),".v3.0anno.csv",sep="")))
+  return(temp)
+} 
 ```
 
 ## add annotiona with full name objects (all) and write it in csv (stored in "output" directory)
