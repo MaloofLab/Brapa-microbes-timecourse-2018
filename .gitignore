@@ -37,3 +37,7 @@ vignettes/*.pdf
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
 .Rproj.user
+
+# user added files
+
+log2cpmSample.csv.gz

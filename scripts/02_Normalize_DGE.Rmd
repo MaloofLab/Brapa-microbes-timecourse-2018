@@ -102,3 +102,35 @@ dge <- calcNormFactors(dge)
 save(dge, file="../output/timecourseDGE.Rdata")
 ```
 
+## save some formatted cpm files
+
+```{r}
+load("../output/timecourseDGE.Rdata")
+```
+
+```{r}
+dge$sample
+```
+
+cpm averaged for each sample type
+```{r}
+log2cpmGroup <- cpmByGroup(dge, log = TRUE)
+dim(log2cpmGroup)
+head(log2cpm[,1:10])
+```
+
+```{r}
+write.csv(log2cpmGroup, "../output/log2cpmGroup.csv.gz")
+```
+
+cpm for each individual sample
+```{r}
+samplenames <- str_c(dge$samples$group,"_blk",dge$samples$block)
+log2cpmSample <- cpmByGroup(dge, log = TRUE, group=samplenames)
+dim(log2cpmSample)
+head(log2cpmSample[,1:10])
+```
+
+```{r}
+write.csv(log2cpmSample, "../output/log2cpmSample.csv.gz")
+```
