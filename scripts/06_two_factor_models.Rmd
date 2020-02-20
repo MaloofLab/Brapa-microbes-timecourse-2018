@@ -121,7 +121,7 @@ dge.twoafternoon <- estimateDisp(dge.twoafternoon,design = dge.twoafternoon.desi
 dge.twoafternoon.fit<- glmFit(dge.twoafternoon,dge.twoafternoon.design)
 ```
 
-# get DEGs, soil_trt effects (coef=c("SBC_OLD"))
+## get DEGs, soil_trt effects (coef=c("SBC_OLD"))
 ```{r}
 twoafternoon.trtlive.lrt <- glmLRT(dge.twoafternoon.fit,coef = c("soil_trtSBC_OLD"))
 ## all
@@ -130,16 +130,16 @@ twoafternoon.trtlive.DEGs.all <- topTags(twoafternoon.trtlive.lrt,n = Inf,p.valu
 twoafternoon.trtlive.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 1474
 ```
 
-# get DEGs, any soil_trt effects interactions
+## get DEGs, soil_trt  interactions
 ```{r}
-twoafternoon.any.trtlive.samplingday.lrt <- glmLRT(dge.twoafternoon.fit,coef = str_which(colnames(dge.twoafternoon.design),"soil_trtSBC_OLD:"))
+twoafternoon.interaction.trtlive.samplingday.lrt <- glmLRT(dge.twoafternoon.fit,coef = str_which(colnames(dge.twoafternoon.design),"soil_trtSBC_OLD:"))
 ## all
-twoafternoon.any.trtlive.samplingday.lrt.DEGs.all <- topTags(twoafternoon.any.trtlive.samplingday.lrt,n = Inf,p.value = 1)$table
+twoafternoon.interaction.trtlive.samplingday.lrt.DEGs.all <- topTags(twoafternoon.interaction.trtlive.samplingday.lrt,n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-twoafternoon.any.trtlive.samplingday.lrt.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 310
+twoafternoon.interaction.trtlive.samplingday.lrt.DEGs.all %>% filter(FDR<0.05) %>% summarize(n()) # 310
 ```
 
-# get DEGs, any soil_trt effects combined 
+## get DEGs, any soil_trt effects combined 
 ```{r}
 twoafternoon.any.trtlive.lrt <- glmLRT(dge.twoafternoon.fit,coef = str_which(colnames(dge.twoafternoon.design),"soil_trtSBC_OLD"))
 ## all
@@ -179,12 +179,18 @@ colnames(dge.diurnal34.design)
 dge.diurnal34 <- estimateDisp(dge.diurnal34,design = dge.diurnal34.design)
 ## fit linear model
 dge.diurnal34.fit <- glmFit(dge.diurnal34,dge.diurnal34.design)
+```
 
+
+trt X time interaction effects
+```{r}
 # get DEGs, interaction effects at any time points (under construction)
-dge.diurnal34.anytime.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),":")) ## all
-dge.diurnal34.anytime.DEGs.all <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 1)$table
+dge.diurnal34.interaction.trtlive.time.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),":")) 
+dge.diurnal34.interaction.trtlive.time.DEGs.all <- topTags(dge.diurnal34.interaction.trtlive.time.lrt,n = Inf,p.value = 1)$table
+
 ## pvalue < 0.05
-dge.diurnal34.anytime.DEGs <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.anytime.DEGs) # 4???? something is wrong???
+dge.diurnal34.interaction.trtlive.time.DEGs <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 0.05)$table
+nrow(dge.diurnal34.interaction.trtlive.time.DEGs) # 4???? something is wrong???
 ```
 BraA05g007030.3C: AT2G38640.1 Unknown
 BraA02g000300.3C: AT5G01210 HXXXD-type acyl-transferase family protein
@@ -197,22 +203,22 @@ trt only
 
 ```{r}
 # get DEGs, trt
-dge.diurnal34.trt.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"^soil_trtSBC_OLD$")) ## all
-dge.diurnal34.trt.DEGs.all <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 1)$table
+dge.diurnal34.trtlive.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"^soil_trtSBC_OLD$")) ## all
+dge.diurnal34.trtlive.DEGs.all <- topTags(dge.diurnal34.trtlive.lrt,n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-dge.diurnal34.trt.DEGs <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.trt.DEGs) # 4593
+dge.diurnal34.trtlive.DEGs <- topTags(dge.diurnal34.trtlive.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.trtlive.DEGs) # 4593
 ```
 
 What about trt + trt:interaction
 ```{r}
 # get DEGs, trt
-dge.diurnal34.trt.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"soil_trtSBC_OLD")) ## all
-dge.diurnal34.trt.DEGs.all <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 1)$table
+dge.diurnal34.any.trtlive.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"soil_trtSBC_OLD")) ## all
+dge.diurnal34.any.trtlive.DEGs.all <- topTags(dge.diurnal34.any.trtlive, n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-dge.diurnal34.trt.DEGs <- topTags(dge.diurnal34.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.trt.DEGs) # 4593
+dge.diurnal34.any.trtlive.DEGs <- topTags(dge.diurnal34.any.trtlive.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.trt.DEGs) # 4593
 ```
 
-Above asks for the interaction effects...what about time on its own?
+time only
 
 ```{r}
 # get DEGs, time
@@ -243,30 +249,38 @@ colnames(dge.diurnal1314.design)
 dge.diurnal1314 <- estimateDisp(dge.diurnal1314,design = dge.diurnal1314.design)
 ## fit linear model
 dge.diurnal1314.fit <- glmFit(dge.diurnal1314,dge.diurnal1314.design)
+```
 
-# get DEGs, interaction effects at any time points (under construction)
-dge.diurnal1314.anytime.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),":")) ## all
-dge.diurnal1314.anytime.DEGs.all <- topTags(dge.diurnal1314.anytime.lrt,n = Inf,p.value = 1)$table
+trt:time interaction
+```{r}
+# get DEGs, interaction effects 
+dge.diurnal1314.interaction.trtlive.time.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),":")) 
+dge.diurnal1314.interaction.trtlive.time.DEGs.all <- topTags(dge.diurnal1314.interaction.trtlive.time.lrt,n = Inf,p.value = 1)$table
+
 ## pvalue < 0.05
-dge.diurnal1314.anytime.DEGs <- topTags(dge.diurnal1314.anytime.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.anytime.DEGs) # 1???? something is wrong???
+dge.diurnal1314.interaction.trtlive.time.DEGs <- topTags(dge.diurnal1314.interaction.trtlive.time.lrt,n = Inf,p.value = 0.05)$table
+nrow(dge.diurnal1314.anytime.DEGs) # 1???? something is wrong???
 
 ```
+
 trt only
 ```{r}
 # get DEGs, trt
-dge.diurnal1314.trt.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),"soil_trtSBC_OLD$")) ## all
-dge.diurnal1314.trt.DEGs.all <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 1)$table
+dge.diurnal1314.trtlive.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),"soil_trtSBC_OLD$")) ## all
+dge.diurnal1314.trtlive.DEGs.all <- topTags(dge.diurnal1314.trtlive.lrt,n = Inf,p.value = 1)$table
+
 ## pvalue < 0.05
-dge.diurnal1314.trt.DEGs <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.trt.DEGs) # 
+dge.diurnal1314.trtlive.DEGs <- topTags(dge.diurnal1314.trtlive.lrt,n = Inf,p.value = 0.05)$table
+nrow(dge.diurnal1314.trtlive.DEGs) #
 ```
 
 What about trt + trt:time?
 ```{r}
 # get DEGs, trt
-dge.diurnal1314.trt.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),"soil_trtSBC_OLD")) ## all
-dge.diurnal1314.trt.DEGs.all <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 1)$table
+dge.diurnal1314.any.trtlive.lrt <- glmLRT(dge.diurnal1314.fit,coef = str_which(colnames(dge.diurnal1314.design),"soil_trtSBC_OLD")) ## all
+dge.diurnal1314.any.trtlive.DEGs.all <- topTags(dge.diurnal1314.any.trtlive.lrt,n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-dge.diurnal1314.trt.DEGs <- topTags(dge.diurnal1314.trt.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.trt.DEGs) # 422
+dge.diurnal1314.any.trtlive.DEGs <- topTags(dge.diurnal1314.any.trtlive.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal1314.any.trtlive.DEGs) # 422
 ```
 
 Above asks for the interaction effects...what about time on its own?
@@ -308,18 +322,28 @@ addAnno <- function(DGE) {
 } 
 ```
 
-## add annotiona with full name objects (all) and write it in csv (stored in "output" directory)
+## add annotation with full name objects (all) and write it in csv (stored in "output" directory)
 ```{r}
-# 
+# two afternoon trt
 twoafternoon.trtlive.DEGs.all.v3.0anno <- addAnno(twoafternoon.trtlive.DEGs.all)
-twoafternoon.any.trtlive.samplingday.lrt.DEGs.all.v3.0anno <- addAnno(twoafternoon.any.trtlive.samplingday.lrt.DEGs.all)
+
+# two afternoon interaction
+twoafternoon.interaction.trtlive.samplingday.lrt.DEGs.all.v3.0anno <- addAnno(twoafternoon.interaction.trtlive.samplingday.lrt.DEGs.all)
+
+# two afternoon trt all
 twoafternoon.any.trtlive.DEGs.all.v3.0anno <- addAnno(twoafternoon.any.trtlive.DEGs.all)
-# 
-dge.diurnal34.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal34.time.DEGs.all)
-dge.diurnal1314.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal1314.time.DEGs.all)
-# adding trt
-dge.diurnal34.trt.DEGs.all.v3.0anno<-addAnno(dge.diurnal34.trt.DEGs.all)
-dge.diurnal1314.trt.DEGs.all.v3.0anno<-addAnno(dge.diurnal1314.trt.DEGs.all)
+
+# diel interaction
+dge.diurnal34.interaction.trtlive.time.DEGs.all.v3.0anno <- addAnno(dge.diurnal34.interaction.trtlive.time.DEGs.all)
+dge.diurnal1314.interaction.trtlive.time.DEGs.all.v3.0anno<-addAnno(dge.diurnal1314.interaction.trtlive.time.DEGs.all)
+
+# diel trt
+dge.diurnal34.trtlive.DEGs.all.v3.0anno <- addAnno(dge.diurnal34.trtlive.DEGs)
+dge.diurnal1314.trtlive.DEGs.all.v3.0anno <- addAnno(dge.diurnal1314.trtlive.DEGs.all)
+
+# diel trt all
+dge.diurnal34.any.trtlive.DEGs.all.v3.0anno <- addAnno(dge.diurnal34.any.trtlive.DEGs.all)
+dge.diurnal1314.any.trtlive.DEGs.all.v3.0anno <- addAnno(dge.diurnal1314.any.trtlive.DEGs.all)
 
 ```
 
