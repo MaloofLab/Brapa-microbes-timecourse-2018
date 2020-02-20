@@ -1,15 +1,11 @@
 ---
 title: "06 Two factor models"
-output:
-  html_document:
-    df_print: paged
-editor_options: 
-  chunk_output_type: inline
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 #library(knitr)
-knitr::opts_chunk$set(echo = TRUE,error=TRUE)
+knitr::opts_chunk$set(echo = TRUE)
 #library(d3heatmap)
 #library(flexdashboard)
 library(edgeR);library(tidyverse)
@@ -60,7 +56,7 @@ mds.pl <- as_tibble(mds$cmdscale.out) %>%
   inner_join(samples.tibble,by="sample")
 # ggplot2 version
 p.bcv<-mds.pl %>% ggplot(aes(x=V1,y=V2, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("timecourse Samples DIM 1 vs 2 bcv")+ facet_grid(sampling_time~sampling_day) + theme_gray()
-ggsave(p,filename="../output/timecourse.mds.bcv.1and2.png",width=12,height=8)
+ggsave(p.bcv,filename="../output/timecourse.mds.bcv.1and2.png",width=12,height=8)
 
 mds.pl %>% ggplot(aes(x=V1,y=V2, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("Samples DIM 1 vs 2 bcv")+ facet_grid(.~block)
 mds.pl %>% ggplot(aes(x=V2,y=V3, shape=sampling_time, color=soil_trt,label=sampling_day)) + geom_point(size=3) + ggtitle("Samples DIM 2 vs 3 bcv")+ facet_grid(.~block)
@@ -189,7 +185,7 @@ dge.diurnal34.interaction.trtlive.time.lrt <- glmLRT(dge.diurnal34.fit,coef = st
 dge.diurnal34.interaction.trtlive.time.DEGs.all <- topTags(dge.diurnal34.interaction.trtlive.time.lrt,n = Inf,p.value = 1)$table
 
 ## pvalue < 0.05
-dge.diurnal34.interaction.trtlive.time.DEGs <- topTags(dge.diurnal34.anytime.lrt,n = Inf,p.value = 0.05)$table
+dge.diurnal34.interaction.trtlive.time.DEGs <- topTags(dge.diurnal34.interaction.trtlive.time.lrt,n = Inf,p.value = 0.05)$table
 nrow(dge.diurnal34.interaction.trtlive.time.DEGs) # 4???? something is wrong???
 ```
 BraA05g007030.3C: AT2G38640.1 Unknown
@@ -213,10 +209,12 @@ What about trt + trt:interaction
 ```{r}
 # get DEGs, trt
 dge.diurnal34.any.trtlive.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"soil_trtSBC_OLD")) ## all
-dge.diurnal34.any.trtlive.DEGs.all <- topTags(dge.diurnal34.any.trtlive, n = Inf,p.value = 1)$table
+dge.diurnal34.any.trtlive.DEGs.all <- topTags(dge.diurnal34.any.trtlive.lrt, n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-dge.diurnal34.any.trtlive.DEGs <- topTags(dge.diurnal34.any.trtlive.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.trt.DEGs) # 4593
+dge.diurnal34.any.trtlive.DEGs <- topTags(dge.diurnal34.any.trtlive.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.any.trtlive.DEGs) # 4593
 ```
+
+dge.diurnal34.any.trtlive.DEGs.all
 
 time only
 
@@ -225,7 +223,7 @@ time only
 dge.diurnal34.time.lrt <- glmLRT(dge.diurnal34.fit,coef = str_which(colnames(dge.diurnal34.design),"^sampling")) ## all
 dge.diurnal34.time.DEGs.all <- topTags(dge.diurnal34.time.lrt,n = Inf,p.value = 1)$table
 ## pvalue < 0.05
-dge.diurnal34.time.DEGs <- topTags(dge.diurnal34.time.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.time.DEGs) # 
+dge.diurnal34.time.DEGs <- topTags(dge.diurnal34.time.lrt,n = Inf,p.value = 0.05)$table;nrow(dge.diurnal34.time.DEGs) # 6892
 ```
 
 ## Days 13 and 14
@@ -259,7 +257,7 @@ dge.diurnal1314.interaction.trtlive.time.DEGs.all <- topTags(dge.diurnal1314.int
 
 ## pvalue < 0.05
 dge.diurnal1314.interaction.trtlive.time.DEGs <- topTags(dge.diurnal1314.interaction.trtlive.time.lrt,n = Inf,p.value = 0.05)$table
-nrow(dge.diurnal1314.anytime.DEGs) # 1???? something is wrong???
+nrow(dge.diurnal1314.interaction.trtlive.time.DEGs) # 1???? something is wrong???
 
 ```
 
@@ -271,7 +269,7 @@ dge.diurnal1314.trtlive.DEGs.all <- topTags(dge.diurnal1314.trtlive.lrt,n = Inf,
 
 ## pvalue < 0.05
 dge.diurnal1314.trtlive.DEGs <- topTags(dge.diurnal1314.trtlive.lrt,n = Inf,p.value = 0.05)$table
-nrow(dge.diurnal1314.trtlive.DEGs) #
+nrow(dge.diurnal1314.trtlive.DEGs) # 26
 ```
 
 What about trt + trt:time?
