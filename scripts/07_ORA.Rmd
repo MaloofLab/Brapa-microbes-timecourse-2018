@@ -81,7 +81,7 @@ head(Bra.v3.0_cdna)
 #  bias.data vector must have the same length as DEgenes vector!
 ```
 
-# ORA: two afternoon and expression pattern
+# ORA: two afternoon trt and expression pattern
 ```{r}
 twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.trtlive.DEGs.all.v3.0anno.csv"))
 
@@ -117,18 +117,63 @@ twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","t
    if(dim(genelist.down)[1]<3) {print("Number of up genes is smaller than three. Skip this."); GO.ORA.temp.down<-"no enriched GO"; next} else {GO.ORA.temp.down<-GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(as_vector(genelist.down)) }
     # handling "no enriched GO" 
     # genelist.names<-c("GO.ORA.temp.up_down","GO.ORA.temp.down_up") # test
-    x<-list(GO.ORA.temp.up=GO.ORA.temp.up,
-            GO.ORA.temp.down=GO.ORA.temp.down) # list
+    x<-list(GO.ORA.up=GO.ORA.temp.up,
+            GO.ORA.down=GO.ORA.temp.down) # list
     # x<-x[!x=="no enriched GO"] # remove "no enriched GO" result
     ## add sample info and FC info and save GO.ORA result
         if(length(x)==0) {next} else {GO.ORA.result<-x}
-GO.ORA.result      
+GO.ORA.result 
+# GO.ORA.result %>% bind_rows() %>% View()
+GO.ORA.result.DF <- GO.ORA.result%>% enframe() %>% unnest(value) # %>% View()
 # save data           
-save(GO.ORA.result,file="../output/GOseq.timecourse.twoafternoon.Brgo.v3.0.Atgoslim.BP.list.enrich.Rdata")
-
+# save(GO.ORA.result,file="../output/GOseq.timecourse.twoafternoon.Brgo.v3.0.Atgoslim.BP.list.enrich.Rdata")
+write_csv(GO.ORA.result.DF, path=file.path("..","output","twoafternoon.trtlive.DEGs.GO.ORA.v3.0anno.csv"))
 ```
 
+# ORA: two afternoon interaction only and expression pattern
+```{r}
+twoafternoon.interaction.trtlive.samplingday.lrt.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.interaction.trtlive.samplingday.lrt.DEGs.all.csv"))
 
+  library(dplyr)
+  #genelist.up<-base::get(paste("../output/",DEG.objs.v3.0annotation.unique[n],sep="")) %>% rownames_to_column() %>%  dplyr::filter(logFC>0) # does not work
+    temp<-twoafternoon.trtlive.DEGs.all.v3.0anno
+    genelist<-temp[temp[,"FDR"]<0.05,"genes"]
+   print(paste("number of up genes is ",dim(genelist)[1]))
+  # expression pattern 
+   gene.of.interest.FDR <- twoafternoon.interaction.trtlive.samplingday.lrt.DEGs.all.v3.0anno %>% filter(FDR< 0.05) %>%
+     dplyr::select(genes,FDR) %>% arrange(FDR)
+   p1<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[1,]);p1
+   p2<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[2,]);p2
+   p3<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[3,]);p3
+   p4<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[4,]);p4
+   p5<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[5,]);p5
+  
+    #genelist.down<-read_csv(paste("../output/",file,sep=""))  %>%  dplyr::filter(logFC.genotypeR500<0)
+   if(dim(genelist)[1]<3) {print("Number of up genes is smaller than three. Skip this."); GO.ORA.temp<-"no enriched GO";next} else {GO.ORA.temp<-GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(as_vector(genelist)) }
+write_csv(GO.ORA.temp, path=file.path("..","output","twoafternoon.interaction.trtlive.samplingday.DEGs.GO.ORA.v3.0anno.csv"))
+```
+
+# ORA: two afternoon trt + interaction only and expression pattern
+```{r}
+twoafternoon.any.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.any.trtlive.DEGs.all.v3.0anno.csv"))
+    temp<-twoafternoon.any.trtlive.DEGs.all.v3.0anno
+    genelist<-temp[temp[,"FDR"]<0.05,"genes"]
+   print(paste("number of up genes is ",dim(genelist)[1]))
+  # expression pattern 
+   gene.of.interest.FDR <- twoafternoon.any.trtlive.DEGs.all.v3.0anno %>% filter(FDR< 0.05) %>%
+     dplyr::select(genes,FDR) %>% arrange(FDR)
+   p1<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[1,]);p1
+   p2<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[2,]);p2
+   p3<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[3,]);p3
+   p4<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[4,]);p4
+   p5<-expression.pattern.Br.graph.timecourse.v3.0annotation.cpm(target.genes.FDR=gene.of.interest.FDR[5,]);p5
+  
+   if(dim(genelist)[1]<3) {print("Number of up genes is smaller than three. Skip this."); GO.ORA.temp<-"no enriched GO";next} else {
+     GO.ORA.temp<-GOseq.Brgo.v3.0.Atgoslim.BP.list.ORA(as_vector(genelist)) 
+   }
+  
+write_csv(GO.ORA.temp, path=file.path("..","output","twoafternoon.any.trtlive.DEGs.DEGs.GO.ORA.v3.0anno.csv"))
+```
 
 # session info
 ```{r}

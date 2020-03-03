@@ -29,19 +29,37 @@ dim(cpm.timecourse.v3.0.log) #[1] 27308   289
 # library(WGCNA) # unable to be installed in R3.6.2
 ```
 
-# twoafternoon.trtlive, twoafternoon.any.trtlive
-## reading DEG
+# two afternoon data (reading DEG files) (under construction)
 ```{r}
-twoafternoon.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.trtlive.DEGs.all.v3.0anno.csv"))
-twoafternoon.any.trtlive.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","twoafternoon.any.trtlive.DEGs.all.v3.0anno.csv"))
-# all trt
-diurnal34.trt.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal34.trt.DEGs.all.v3.0anno.csv"))
-diurnal1314.trt.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal1314.trt.DEGs.all.v3.0anno.csv"))
-# all time
-diurnal34.trt.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal34.trt.DEGs.all.v3.0anno.csv"))
-diurnal1314.time.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal1314.time.DEGs.all.v3.0anno.csv"))
+# soil_trt effects (coef=c("SBC_OLD"))
+twoafternoon.trtlive.DEGs.all
+
+# interaction, coef = str_which(colnames(dge.twoafternoon.design),"soil_trtSBC_OLD:")
+twoafternoon.interaction.trtlive.samplingday.lrt.DEGs.all.v3.0anno <- read_csv(file=file.path("..","output","twoafternoon.interaction.trtlive.samplingday.lrt.DEGs.all.csv")) 
+
+# day effects only, coef = str_which(colnames(dge.twoafternoon.design),"^sampling")
+
+# 
+
+```
+
+# diel data (reading DEG files)
+```{r}
+# treatment only
+dge.diurnal34.trtlive.DEGs.all.v3.0anno <- read_csv(file=file.path("..","output","dge.diurnal34.trt.DEGs.all.csv")) # updated error
+dge.diurnal1314.trtlive.DEGs.all.v3.0anno <- read_csv(file=file.path("..","output","dge.diurnal1314.trt.DEGs.all.csv")) # updated error
+
+# treatment and treatment:time interaction
+dge.diurnal34.any.trtlive.DEGs.all.v3.0anno <- read_csv(file=file.path("..","output","dge.diurnal34.any.trtlive.DEGs.all.v3.0anno.csv"))
+dge.diurnal1314.any.trtlive.DEGs.all.v3.0anno <- read_csv(file=file.path("..","output","dge.diurnal1314.any.trtlive.DEGs.all.v3.0anno.csv"))
+
+# interaction (coef = str_which(colnames(dge.diurnal34.design),":"))
+dge.diurnal34.interaction.trtlive.time.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal34.interaction.trtlive.time.DEGs.all.v3.0anno.csv")) # updated
+# interaction (coef = str_which(colnames(dge.diurnal1314.design),":"))
+dge.diurnal1314.interaction.trtlive.time.DEGs.all.v3.0anno<-read_csv(file=file.path("..","output","dge.diurnal1314.interaction.trtlive.time.DEGs.all.v3.0anno.csv")) # updated
+
 # check
-diurnal1314.time.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dim() # [1] 12080    13
+dge.diurnal34.trtlive.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dim() # [1] 
 
 ```
 # format data
@@ -155,7 +173,7 @@ cpm.timecourse.v3.0.log.largeCV<-read.csv(file.path("..","output","cpm.timecours
 
 ```
 
-# back to my vomputer to look WGCNA results
+# back to my computer to look WGCNA results
 ```{r}
 cpm.timecourse.v3.0.log.largeCV<-read.csv(file.path("..","output","cpm.timecourse.v3.0.log.largeCV.csv.gz")) 
 dim(cpm.timecourse.v3.0.log.largeCV) # [1] 17262   289 -> [1] 10173   290 (Feb 01, 2020)
