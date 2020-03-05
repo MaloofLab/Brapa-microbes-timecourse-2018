@@ -929,7 +929,7 @@ temp %>% unnest(GO_result) %>% dplyr::select(-transcripts)   %>% write_csv(path=
 
 # Diurnal any trt DEGS (3/4 days) clustering and cluster ORAs
 ```{r}
-dge.diurnal34.any.trtlive.DEGs.all.v3.0anno
+dge.diurnal34.any.trtlive.DEGs.all.v3.0anno %>% head()
 ```
 
 ```{r}
@@ -1032,12 +1032,12 @@ ggsave(p15.diurnal34.any.trt,file="../output/diurnal34.any.trt.DEG.Kmean.15clust
 
 # Diurnal DEGS (13/14 days) clustering and cluster ORAs
 ```{r}
-dge.diurnal1314.any.trtlive.DEGs.all.v3.0anno
+dge.diurnal1314.any.trtlive.DEGs.all.v3.0anno %>% head()
 ```
 
 ```{r}
 # scaling expression data
-cpm.timecourse.v3.0.scale
+cpm.timecourse.v3.0.scale %>% head()
 # diurnal 3and4 days DEG expression data (scaled)
 cpm.timecourse.v3.0.scale.diurnal1314.any.trt.DEG<-cpm.timecourse.v3.0.scale  %>% 
   inner_join(dge.diurnal1314.any.trtlive.DEGs.all.v3.0anno %>% filter(FDR<0.05) %>% dplyr::select(genes),by=c(transcript_ID="genes")) %>%
