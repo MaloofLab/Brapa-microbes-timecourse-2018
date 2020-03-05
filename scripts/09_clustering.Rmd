@@ -929,7 +929,11 @@ temp %>% unnest(GO_result) %>% dplyr::select(-transcripts)   %>% write_csv(path=
 
 # Diurnal any trt DEGS (3/4 days) clustering and cluster ORAs
 ```{r}
+<<<<<<< HEAD
 dge.diurnal34.any.trtlive.DEGs.all.v3.0anno %>% head()
+=======
+dge.diurnal34.any.trtlive.DEGs.all.v3.0anno
+>>>>>>> abb722b8016c541dc94e8c9827ca932c9c992d33
 ```
 
 ```{r}
@@ -1032,7 +1036,11 @@ ggsave(p15.diurnal34.any.trt,file="../output/diurnal34.any.trt.DEG.Kmean.15clust
 
 # Diurnal DEGS (13/14 days) clustering and cluster ORAs
 ```{r}
+<<<<<<< HEAD
 dge.diurnal1314.any.trtlive.DEGs.all.v3.0anno %>% head()
+=======
+dge.diurnal1314.any.trtlive.DEGs.all.v3.0anno
+>>>>>>> abb722b8016c541dc94e8c9827ca932c9c992d33
 ```
 
 ```{r}
