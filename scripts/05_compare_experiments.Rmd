@@ -1,0 +1,109 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Are Kazu's common genes from experiment 1 also found here?
+
+```{r}
+library(tidyverse)
+library(edgeR)
+```
+
+```{r}
+load("../output/TimeCourseDGE_LRT.Rdata") # from time course
+exp1 <- read_csv("../../Brapa_microbes/v3.0annotation/20170617-samples/output/DEG.v3.0anno.table2.overlap.atleastOneDEG.csv") # exp1, from Kazu
+```
+
+
+```{r}
+names(models)
+DEgenes <- models %>% 
+  mutate(toptags = map(lrt, ~ topTags(.,n=Inf)), #pull the DE gene info out of each model
+         toptags = map(toptags, ~ .$table), # get the table of DE info
+         toptags = map(toptags, ~ rownames_to_column(., "transcript_ID"))) %>%
+  unnest(toptags) %>%
+  group_by(transcript_ID)
+total.genes <- DEgenes %>% pull(transcript_ID) %>% unique() %>% length()
+DEgenes <- DEgenes %>%  filter(min(FDR) < 0.05) # only keep genes where FDR < 0.05 in at least one comparison.
+DEgenes %>% arrange(transcript_ID, FDR) %>% select(day_time, transcript_ID, logFC, FDR)
+```
+
+Need to figure out what I need from Kazu's table
+```{r}
+names(exp1)
+```
+
+```{r}
+exp1.small <- exp1 %>%
+  select_at(.vars = vars(transcript_ID, matches("root.*rbd.*NB"))) %>%
+  mutate(detectedin=rowSums(.[,-1])) %>%
+  select(transcript_ID, detectedin, everything()) %>%
+  filter(detectedin >= 4) # majority
+exp1.small
+```
+
+
+```{r}
+overlap <- DEgenes %>% filter(FDR < 0.05) %>% 
+  group_by(day_time) %>%
+  summarize(total=n(), overlap=sum(transcript_ID %in% exp1.small$transcript_ID), unique=total-overlap)
+overlap
+```
+
+significance? set up for fisher test
+
+```{r}
+makematrix <- function(data) {
+  m <- matrix(c(data$overlap, data$unique.tc, data$unique.exp1, data$neither), ncol=2)
+}
+fisher <- overlap %>%
+  rename(unique.tc = unique) %>%
+  mutate(unique.exp1 = nrow(exp1.small)-overlap,
+         neither=total.genes-unique.tc-unique.exp1-overlap) %>%
+  nest(-day_time) %>%
+  mutate(m = map(data,makematrix),
+         fisher = map(m, fisher.test))
+fisher
+```
+
+```{r}
+library(broom)
+fisher <- fisher %>% 
+  mutate(glance = map(fisher, glance)) %>% 
+  unnest(glance) %>%
+  mutate(star=NA,
+         star=ifelse(p.value < 0.05, "*", star),
+         star=ifelse(p.value < 0.01, "**", star),
+         star=ifelse(p.value < 0.001, "***", star))
+fisher
+```
+
+```{r}
+overlap <- fisher %>% select(day_time, star) %>% right_join(overlap)
+```
+
+
+```{r}
+overlap %>%
+  select(-total) %>%
+  gather(key="set", value="genes", -day_time) %>%
+  ggplot(aes(x=day_time, y=genes, fill=set)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle=90, hjust = 1, vjust=0.5))
+```
+
+hard to see, so just plot overlap...
+
+```{r}
+overlap %>%
+  ggplot(aes(x=day_time, y=overlap, label=star)) +
+  geom_col() +
+  geom_text(nudge_y = .5) +
+  theme(axis.text.x = element_text(angle=90, hjust = 1, vjust=0.5)) +
+  ggtitle("overlap, 82 exp1 majority rule genes and timecourse")
+```
+
+
+
+
