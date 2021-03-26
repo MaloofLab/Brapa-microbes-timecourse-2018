@@ -1,0 +1,37 @@
+---
+title: "06_multi-factor_DGE"
+author: "Julin N Maloof"
+date: "9/2/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+load("../output/timecourseDGE.Rdata")
+```
+
+check the experimental factors so that we know what we have
+```{r}
+dge$samples$day_time <- str_c(dge$samples$sampling_day,"-",dge$samples$sampling_time)
+
+cat("soil_trt: ", unique(dge$samples$soil_trt), "\n\n")
+cat("day: ", unique(dge$samples$sampling_day), "\n\n")
+cat("time: ", unique(dge$samples$sampling_time), "\n\n")
+cat("day_time: ", unique(dge$samples$day_time), "\n\n")
+```
+
+
+```{r}
+design <- model.matrix(~soil_trt*day_time + block, data=dge$samples)
+design
+dge1 <- estimateDisp(dge, design = design)
+```
+
+```{r}
+colnames(design)
+```
+
