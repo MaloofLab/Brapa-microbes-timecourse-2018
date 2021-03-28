@@ -129,8 +129,11 @@ samplenames <- str_c(dge$samples$group,"_blk",dge$samples$block)
 log2cpmSample <- cpmByGroup(dge, log = TRUE, group=samplenames)
 dim(log2cpmSample)
 head(log2cpmSample[,1:10])
+log2cpmSample <- log2cpmSample %>% dplyr::rename("gene"=X1)
 ```
 
 ```{r}
 write.csv(log2cpmSample, "../output/log2cpmSample.csv.gz")
+write_tsv(log2cpmSample, "../output/log2cpmSample.txt.gz") # .txt is compatible to GSEA app.
+
 ```
