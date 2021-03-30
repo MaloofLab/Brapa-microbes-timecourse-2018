@@ -43,22 +43,21 @@ test.map <- dge$samples %>% split(.$sampling_time) %>% map(~split(., .$sampling_
 # divide expression data & csl file (phenotype) for GSEA
 ```{r}
 log2cpmSample <- read_tsv(file.path("..","output","log2cpmSample.txt.gz"))
-write_cls2 <-function(x,y) { # x is dafa.frame y is file name
-  print("x is");print(x)
-Total <- dim(x)[1];print(Total)
-description <- "# LIVE BLANK";print(description)
-Live.Blank <- x %>% dplyr::select(matches("soil_trt")) %>% as_vector()
-Live.Blank <- ifelse(Live.Blank=="SBC_OLD",0,1) # "live" is zero 
-print(Live.Blank)
-# writing cls file
-cat(paste(Total,"2","1","\n"),file=file.path("..","output",paste(y,".csl",sep="")))
-cat(paste(description,"\n"),file=file.path("..","output",paste(y,".csl",sep="")),append=TRUE)
-cat(Live.Blank,file=file.path("..","output",paste(y,".csl",sep="")),append=TRUE)
-}
+# write_cls2 <-function(x,y) { # x is dafa.frame y is file name
+#   print("x is");print(x)
+# Total <- dim(x)[1];print(Total)
+# description <- "# LIVE BLANK";print(description)
+# Live.Blank <- x %>% dplyr::select(matches("soil_trt")) %>% as_vector()
+# Live.Blank <- ifelse(Live.Blank=="SBC_OLD",0,1) # "live" is zero 
+# print(Live.Blank)
+# # writing cls file
+# cat(paste(Total,"2","1","\n"),file=file.path("..","output",paste(y,".csl",sep="")))
+# cat(paste(description,"\n"),file=file.path("..","output",paste(y,".csl",sep="")),append=TRUE)
+# cat(Live.Blank,file=file.path("..","output",paste(y,".csl",sep="")),append=TRUE)
+# }
 for(i in 1:5) {
-  for(n in 1:4) {
+  for(n in 1:length(names(test.map[[i]]))) {
     # sampleID.temp <- dge$samples %>% filter(sampling_time==names(test.map)[i],sampling_day==names(test.map[[i]])[n]) %>% rownames_to_column(var="sampleID") %>% dplyr::select(sampleID) %>% as_vector()
-    
     x <- log2cpmSample %>% dplyr::select(gene,matches(names(test.map)[i]) & matches(names(test.map[[i]])[n]))# %>% colnames()
     # write cls
     Total <- length(colnames(x)[-1]);print(Total)
@@ -165,8 +164,9 @@ sampling_day_time.summary <- dge$samples %>% dplyr::count(sampling_day,sampling_
 
 sampling_day_time_soil.summary <- dge$samples %>% dplyr::count(sampling_day,sampling_time,soil_trt) %>% mutate(LorB=ifelse(soil_trt=="ATM_BLANK","B","L")) %>% unite(time_day_LorB,sampling_time,sampling_day,LorB,remove=FALSE)
 
+# "all"  
 all <- tibble(sampling_day_time_soil = rep(sampling_day_time_soil.summary$time_day_LorB,each=length(genes.count2$NAME)),
-              NAME=rep(genes.count2$NAME,dim(sampling_day_time_soil.summary)[1])) %>% unite(time_day_LorB_NAME,sampling_day_time_soil,NAME,remove=FALSE)
+              NAME=rep(genes.count2$NAME,dim(sampling_day_time_soil.summary)[1])) %>% unite(time_day_LorB_NAME,sampling_day_time_soil,NAME,remove=FALSE) 
 ```
 
 
@@ -203,7 +203,8 @@ GSEA_reports.DF.formatted[is.na(GSEA_reports.DF.formatted)] <- 0
 
 ### there are bugs to fill in missing NAME and missing time_day_LorB below
 GSEA_reports.DF.formatted <- GSEA_reports.DF.formatted %>% unite(time_day_LorB_NAME, time_day_LorB,NAME,remove=FALSE) 
-missing <- all %>% anti_join(GSEA_reports.DF.formatted,by="time_day_LorB_NAME") %>% mutate(`-log10 FDR q-val`=0) %>% rename(time_day_LorB=sampling_day_time_soil)
+missing <- sampling_day_time_soil.summary
+ %>% anti_join(GSEA_reports.DF.formatted,by="time_day_LorB_NAME") %>% mutate(`-log10 FDR q-val`=0) %>% rename(time_day_LorB=sampling_day_time_soil)
 print("missing");print(missing)
 GSEA_reports.DF.formatted.all <- GSEA_reports.DF.formatted %>% bind_rows(missing)
   
