@@ -7,6 +7,11 @@ editor_options:
   chunk_output_type: console
 ---
 
+* History
+** 
+
+* To Do
+**
 ```{r setup, include=FALSE}
 rm(list=ls())
 knitr::opts_chunk$set(error = TRUE,warning=FALSE)
@@ -43,18 +48,6 @@ test.map <- dge$samples %>% split(.$sampling_time) %>% map(~split(., .$sampling_
 # divide expression data & csl file (phenotype) for GSEA
 ```{r}
 log2cpmSample <- read_tsv(file.path("..","output","log2cpmSample.txt.gz"))
-# write_cls2 <-function(x,y) { # x is dafa.frame y is file name
-#   print("x is");print(x)
-# Total <- dim(x)[1];print(Total)
-# description <- "# LIVE BLANK";print(description)
-# Live.Blank <- x %>% dplyr::select(matches("soil_trt")) %>% as_vector()
-# Live.Blank <- ifelse(Live.Blank=="SBC_OLD",0,1) # "live" is zero 
-# print(Live.Blank)
-# # writing cls file
-# cat(paste(Total,"2","1","\n"),file=file.path("..","output",paste(y,".csl",sep="")))
-# cat(paste(description,"\n"),file=file.path("..","output",paste(y,".csl",sep="")),append=TRUE)
-# cat(Live.Blank,file=file.path("..","output",paste(y,".csl",sep="")),append=TRUE)
-# }
 for(i in 1:5) {
   for(n in 1:length(names(test.map[[i]]))) {
     # sampleID.temp <- dge$samples %>% filter(sampling_time==names(test.map)[i],sampling_day==names(test.map[[i]])[n]) %>% rownames_to_column(var="sampleID") %>% dplyr::select(sampleID) %>% as_vector()
@@ -77,7 +70,7 @@ write_tsv(x,file.path("..","output",paste(names(test.map)[i],names(test.map[[i]]
 # 
 ```{r}
 # custom categories list
-load(file.path("Annotation_copy","output","v3.0annotation","GSEA_cust_rootshoot_updown2.list.Rdata"))
+load(file.path("..","Annotation_copy","output","v3.0annotation","GSEA_cust_rootshoot_updown2.list.Rdata"))
 names(GSEA_cust_rootshoot_updown2.list)
 GSEA_cust_rootshoot_updown2.list[["BraA01g000020.3C"]]
 ```
@@ -123,8 +116,8 @@ GSEA_reports.DF %>% View()
 ```{r}
 GSEA_reports.DF.custom <- GSEA_reports.DF %>% filter(str_detect(report2,"custom"))
 # separate time and day
-GSEA_reports.DF.custom$sampling_time <- gsub("(1_morn|2_afternoon|3_evening_5.30|4_night_1|5_night_2)(\\.)(01|02|03|04|06|13|14)(.custom.Gsea.)([[:print:]]+)","\\1", GSEA_reports.DF.custom$report2)
-GSEA_reports.DF.custom$sampling_day <- gsub("(1_morn|2_afternoon|3_evening_5.30|4_night_1|5_night_2)(\\.)(01|02|03|04|06|13|14)(.custom.Gsea.)([[:print:]]+)","\\3", GSEA_reports.DF.custom$report2)
+GSEA_reports.DF.custom$sampling_time <- gsub("(1_morn|2_afternoon|3_evening_5.30|4_night_1|5_night_2)(\\.)(01|02|03|04|06|08|13|14)(.custom.Gsea.)([[:print:]]+)","\\1", GSEA_reports.DF.custom$report2)
+GSEA_reports.DF.custom$sampling_day <- gsub("(1_morn|2_afternoon|3_evening_5.30|4_night_1|5_night_2)(\\.)(01|02|03|04|06|08|13|14)(.custom.Gsea.)([[:print:]]+)","\\3", GSEA_reports.DF.custom$report2)
 # Live or Blank
 GSEA_reports.DF.custom <- GSEA_reports.DF.custom %>% mutate(LorB=ifelse(str_detect(report3,"_LIVE_"),"L","B"))
 # check
@@ -175,20 +168,12 @@ all <- tibble(sampling_day_time_soil = rep(sampling_day_time_soil.summary$time_d
 ```{r}
 # plot function
 GSEA_reports.DF.plot.nodendrogram.custom.notitle <- function(data = GSEA_reports.DF.custom,
-                                            #setCutoff = set, 
-                                            # ts="root",
-                                            # LD="Dead",
-                                            #R500="minusR500",
                                             GSEA.FDR.cutoff = cutoff,
-                                            #tp=c("residexp_only","uncorrecected"),
-                                            # leaf_avg_std.ML.data = ElasticNet0.5_multiCV_Pct_var,
                                             top.margin=830,
                                             bottom.margin=40,
-                                            #dendrogram=c("TRUE", "FALSE"),
                                             legend.height=45,
                                             legend.width=25,
                                             LorB=c("L","B")
-                                            #modules=c("fullmodule","selected")
                                             ) {
   # Scale each measurement (independently) to have a mean of 0 and variance of 1
 # new version (zero in `FDR q-val` is arbitrally converted into 0.000000001 because -log10(0) gave me "Inf")
@@ -203,8 +188,7 @@ GSEA_reports.DF.formatted[is.na(GSEA_reports.DF.formatted)] <- 0
 
 ### there are bugs to fill in missing NAME and missing time_day_LorB below
 GSEA_reports.DF.formatted <- GSEA_reports.DF.formatted %>% unite(time_day_LorB_NAME, time_day_LorB,NAME,remove=FALSE) 
-missing <- sampling_day_time_soil.summary
- %>% anti_join(GSEA_reports.DF.formatted,by="time_day_LorB_NAME") %>% mutate(`-log10 FDR q-val`=0) %>% rename(time_day_LorB=sampling_day_time_soil)
+missing <- all %>% anti_join(GSEA_reports.DF.formatted,by="time_day_LorB_NAME") %>% mutate(`-log10 FDR q-val`=0) %>% rename(time_day_LorB=sampling_day_time_soil)
 print("missing");print(missing)
 GSEA_reports.DF.formatted.all <- GSEA_reports.DF.formatted %>% bind_rows(missing)
   
@@ -275,7 +259,7 @@ GSEA.timecourse_soil_LIVE <- GSEA_reports.DF.plot.nodendrogram.custom.notitle(da
 GSEA.timecourse_soil_BLANK <- GSEA_reports.DF.plot.nodendrogram.custom.notitle(data = GSEA_reports.DF.custom,top.margin=0,bottom.margin=0,LorB="B")
 # combined
 GSEA.timecourse_soil_all <- plot_grid(GSEA.timecourse_soil_LIVE,GSEA.timecourse_soil_BLANK,align="h",labels=c("Live","Blank"))
-ggsave2(GSEA.timecourse_soil_all,filename="GSEA.timecourse_soil_all.png",path=file.path("..","output"),width=20,height=8)
+ggsave2(GSEA.timecourse_soil_all,filename="GSEA.timecourse_soil_all2.png",path=file.path("..","output"),width=20,height=8)
 
 ```
 
