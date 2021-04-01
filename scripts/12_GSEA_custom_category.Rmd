@@ -258,7 +258,7 @@ GSEA.timecourse_soil_LIVE <- GSEA_reports.DF.plot.nodendrogram.custom.notitle(da
 # Blank
 GSEA.timecourse_soil_BLANK <- GSEA_reports.DF.plot.nodendrogram.custom.notitle(data = GSEA_reports.DF.custom,top.margin=0,bottom.margin=0,LorB="B")
 # combined
-GSEA.timecourse_soil_all <- plot_grid(GSEA.timecourse_soil_LIVE,GSEA.timecourse_soil_BLANK,align="h",labels=c("Live","Blank"))
+GSEA.timecourse_soil_all <- plot_grid(GSEA.timecourse_soil_LIVE,GSEA.timecourse_soil_BLANK,align="h",labels=c("Blank","Live"))
 ggsave2(GSEA.timecourse_soil_all,filename="GSEA.timecourse_soil_all2.png",path=file.path("..","output"),width=20,height=8)
 
 ```
