@@ -116,8 +116,8 @@ GSEA_reports.DF %>% View()
 ```{r}
 GSEA_reports.DF.custom <- GSEA_reports.DF %>% filter(str_detect(report2,"custom"))
 # separate time and day
-GSEA_reports.DF.custom$sampling_time <- gsub("(1_morn|2_afternoon|3_evening_5.30|4_night_1|5_night_2)(\\.)(01|02|03|04|06|08|13|14)(.custom.Gsea.)([[:print:]]+)","\\1", GSEA_reports.DF.custom$report2)
-GSEA_reports.DF.custom$sampling_day <- gsub("(1_morn|2_afternoon|3_evening_5.30|4_night_1|5_night_2)(\\.)(01|02|03|04|06|08|13|14)(.custom.Gsea.)([[:print:]]+)","\\3", GSEA_reports.DF.custom$report2)
+GSEA_reports.DF.custom$sampling_time <- gsub("(1_morn|2_afternoon|3_evening_5.30|4_night_1|5_night_2)(\\.)(01|02|03|04|06|08|10|13|14)(.custom.Gsea.)([[:print:]]+)","\\1", GSEA_reports.DF.custom$report2)
+GSEA_reports.DF.custom$sampling_day <- gsub("(1_morn|2_afternoon|3_evening_5.30|4_night_1|5_night_2)(\\.)(01|02|03|04|06|08|10|13|14)(.custom.Gsea.)([[:print:]]+)","\\3", GSEA_reports.DF.custom$report2)
 # Live or Blank
 GSEA_reports.DF.custom <- GSEA_reports.DF.custom %>% mutate(LorB=ifelse(str_detect(report3,"_LIVE_"),"L","B"))
 # check
