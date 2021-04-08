@@ -54,7 +54,7 @@ for(i in 1:5) {
     x <- log2cpmSample %>% dplyr::select(gene,matches(names(test.map)[i]) & matches(names(test.map[[i]])[n]))# %>% colnames()
     # write cls
     Total <- length(colnames(x)[-1]);print(Total)
-description <- "# LIVE BLANK";print(description)
+description <- "# LIVE BLANK";print(description) #  ("# (space) (class 0 name) (space) (class 1 name)")
 Live.Blank <- ifelse(str_detect(colnames(x)[-1],"SBC_OLD"),0,1) # "live" is zero 
 print(Live.Blank)
 # writing cls file
@@ -152,14 +152,16 @@ genes.count2 <- genes.count %>% mutate(NAME=str_to_upper(NAME)) %>%
 
 ```
 
+# revised for day_time_LorB 
 ```{r}
 sampling_day_time.summary <- dge$samples %>% dplyr::count(sampling_day,sampling_time)
 
-sampling_day_time_soil.summary <- dge$samples %>% dplyr::count(sampling_day,sampling_time,soil_trt) %>% mutate(LorB=ifelse(soil_trt=="ATM_BLANK","B","L")) %>% unite(time_day_LorB,sampling_time,sampling_day,LorB,remove=FALSE)
+sampling_day_time_soil.summary <- dge$samples %>% dplyr::count(sampling_day,sampling_time,soil_trt) %>% mutate(LorB=ifelse(soil_trt=="ATM_BLANK","B","L")) %>% unite(time_day_LorB,sampling_time,sampling_day,LorB,remove=FALSE) %>% unite(day_time_LorB,sampling_day,sampling_time,LorB,remove=FALSE)
 
 # "all"  
-all <- tibble(sampling_day_time_soil = rep(sampling_day_time_soil.summary$time_day_LorB,each=length(genes.count2$NAME)),
-              NAME=rep(genes.count2$NAME,dim(sampling_day_time_soil.summary)[1])) %>% unite(time_day_LorB_NAME,sampling_day_time_soil,NAME,remove=FALSE) 
+all <- tibble(sampling_day_time_soil = rep(sampling_day_time_soil.summary$day_time_LorB,each=length(genes.count2$NAME)),
+              NAME=rep(genes.count2$NAME,dim(sampling_day_time_soil.summary)[1])) %>% unite(day_time_LorB_NAME,sampling_day_time_soil,NAME,remove=FALSE) 
+
 ```
 
 ### modify following scripts ####
@@ -174,7 +176,7 @@ GSEA_reports.DF.plot.nodendrogram.custom.notitle <- function(data = GSEA_reports
                                             legend.width=25,
                                             LorB=c("L","B")) {
 # modify this for timecourse_custom
-GSEA_reports.DF.formatted <- data  %>%  dplyr::select(sampling_time, sampling_day,LorB,NAME,`FDR q-val`) %>% mutate(`FDR q-val`=as.numeric(str_replace(`FDR q-val`,"^0$","0.01"))) %>% mutate(`-log10 FDR q-val`=-log10(`FDR q-val`)) %>% dplyr::select(-`FDR q-val`) %>% unite(time_day_LorB,sampling_time,sampling_day, LorB,remove=TRUE) %>% arrange(NAME)
+GSEA_reports.DF.formatted <- data  %>%  dplyr::select(sampling_time, sampling_day,LorB,NAME,`FDR q-val`) %>% mutate(`FDR q-val`=as.numeric(str_replace(`FDR q-val`,"^0$","0.01"))) %>% mutate(`-log10 FDR q-val`=-log10(`FDR q-val`)) %>% dplyr::select(-`FDR q-val`) %>% unite(day_time_LorB,sampling_day,sampling_time, LorB,remove=TRUE) %>% arrange(NAME)
 ## check
 print("GSEA_reports.DF.formatted")
 GSEA_reports.DF.formatted %>% View()
@@ -183,8 +185,8 @@ GSEA_reports.DF.formatted[is.na(GSEA_reports.DF.formatted)] <- 0
 # remove all colums are zero (otherwise resulting "NaN" after scale())
 
 ### there are bugs to fill in missing NAME and missing time_day_LorB below
-GSEA_reports.DF.formatted <- GSEA_reports.DF.formatted %>% unite(time_day_LorB_NAME, time_day_LorB,NAME,remove=FALSE) 
-missing <- all %>% anti_join(GSEA_reports.DF.formatted,by="time_day_LorB_NAME") %>% mutate(`-log10 FDR q-val`=0) %>% rename(time_day_LorB=sampling_day_time_soil)
+GSEA_reports.DF.formatted <- GSEA_reports.DF.formatted %>% unite(day_time_LorB_NAME, day_time_LorB,NAME,remove=FALSE) 
+missing <- all %>% anti_join(GSEA_reports.DF.formatted,by="day_time_LorB_NAME") %>% mutate(`-log10 FDR q-val`=0) %>% rename(day_time_LorB=sampling_day_time_soil)
 print("missing");print(missing)
 GSEA_reports.DF.formatted.all <- GSEA_reports.DF.formatted %>% bind_rows(missing)
   
@@ -195,9 +197,9 @@ print("GSEA_reports.DF.formatted")
 #GSEA_reports.DF.formatted.all %>% View()
 # LorB
 if(LorB=="L") {
-  GSEA_reports.DF.formatted.all <- GSEA_reports.DF.formatted.all %>% filter(str_detect(time_day_LorB,"_L"))
+  GSEA_reports.DF.formatted.all <- GSEA_reports.DF.formatted.all %>% filter(str_detect(day_time_LorB,"_L"))
 } else {
-    GSEA_reports.DF.formatted.all <- GSEA_reports.DF.formatted.all %>% filter(str_detect(time_day_LorB,"_B"))
+    GSEA_reports.DF.formatted.all <- GSEA_reports.DF.formatted.all %>% filter(str_detect(day_time_LorB,"_B"))
     }
 print("after LorB selection")
 GSEA_reports.DF.formatted.all %>% View()
@@ -258,10 +260,10 @@ GSEA_reports.DF.formatted.all %>% View()
 
 # plot (base)
 GSEA_reports.DF.plot <- GSEA_reports.DF.formatted.all %>% 
-  ggplot(aes(x=category3.tissue.au.up_down,y=time_day_LorB)) + geom_tile(aes(fill=`-log10 FDR q-val`),colour="black")  + scale_fill_gradient2(limit=c(0,3), high=muted("magenta")) 
+  ggplot(aes(x=category3.tissue.au.up_down,y=day_time_LorB)) + geom_tile(aes(fill=`-log10 FDR q-val`),colour="black")  + scale_fill_gradient2(limit=c(0,3), high=muted("magenta")) 
 
-# + scale_x_discrete(sec.axis=dup_axis())# not working
-GSEA_reports.DF.plot <- GSEA_reports.DF.plot +     theme(axis.text.x=element_text(size=9,angle=90,vjust=-0.001),
+# + scale_x_discrete(sec.axis=dup_axis())# not working, ,vjust=-0.0001
+GSEA_reports.DF.plot <- GSEA_reports.DF.plot +     theme(axis.text.x=element_text(size=9,angle=90,vjust=0.7),
       axis.text.y=element_text(size=10),
       axis.title=element_text(size=10),
       axis.ticks = element_blank(),
@@ -310,7 +312,7 @@ GSEA.timecourse_soil_LIVE <- GSEA_reports.DF.plot.nodendrogram.custom.notitle(da
 GSEA.timecourse_soil_BLANK <- GSEA_reports.DF.plot.nodendrogram.custom.notitle(data = GSEA_reports.DF.custom,top.margin=0,bottom.margin=0,LorB="B")
 # combined
 GSEA.timecourse_soil_all <- plot_grid(GSEA.timecourse_soil_LIVE,GSEA.timecourse_soil_BLANK,align="h",labels=c("Blank","Live"))
-ggsave2(GSEA.timecourse_soil_all,filename="GSEA.timecourse_soil_all3.png",path=file.path("..","output"),width=20,height=8)
+ggsave2(GSEA.timecourse_soil_all,filename="GSEA.timecourse_soil_all4.png",path=file.path("..","output"),width=20,height=8)
 
 ```
 
