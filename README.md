@@ -50,3 +50,12 @@ dge.diurnal1314.trt.DEGs.all __IS NOW__ dge.diurnal1314.trtlive.DEGs.all
 dge.diurnal1314.trt.DEGs.all __IS NOW__ dge.diurnal1314.any.trtlive.DEGs.all
 
 
+## importing ASVs (email from Scott Klasek)
+
+```
+library("phyloseq")
+phyloseq_object <- readRDS(file="path/to/rhizo.ps")
+otu_table(phyloseq_object) # the read count data
+tax_table(phyloseq_object) # taxonomy data
+sample_data(phyloseq_object) # sample information
+```
