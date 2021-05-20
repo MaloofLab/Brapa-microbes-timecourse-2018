@@ -14,13 +14,13 @@ rgr <- read_csv("../input/RGR.RESULTS.csv")
 rgr
 ```
 ```{r}
-cpm <- read_tsv("../output/log2cpmSample.txt.gz")
+cpm <- read_tsv("../../RNAseq/output/log2cpmSample.txt.gz")
 dim(cpm)
 head(cpm[,1:10])
 ```
 
 ```{r}
-tubes <- readxl::read_excel("../input/tube_no_legend_time_course_2018.xlsx")
+tubes <- readxl::read_excel("../../RNAseq/input/tube_no_legend_time_course_2018.xlsx")
 head(tubes)
 ```
 
