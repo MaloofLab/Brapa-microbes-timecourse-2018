@@ -1,0 +1,62 @@
+---
+title: "Untitled"
+author: "Julin Maloof"
+date: "6/2/2021"
+output: html_document
+---
+
+The purpose of this is to generate a file for use in Julin's BIS180L final exam.
+
+run the beginning of 02_normalize_DGE.Rmd first, to get count2 and samples
+
+```{r}
+samples
+```
+
+
+```{r}
+samples <- samples %>%
+  group_by(group) %>%
+  mutate(rep=row_number()) %>%
+  ungroup() %>%
+  mutate(newname= {str_c(soil_trt, sampling_day, rep, sep = "-") %>%
+      str_replace("SBC_OLD", "MICRB") %>%
+      str_remove("ATM_")})
+
+samples  
+```
+
+
+```{r}
+all(colnames(counts2) == samples$file)
+```
+
+```{r}
+colnames(counts2) <- samples$newname
+```
+
+```{r}
+counts2 <- counts2[,str_detect(samples2$sampling_time, "afternoon")]
+head(counts2)
+dim(counts2)
+```
+
+```{r}
+counts2 <- counts2[,str_detect(colnames(counts2), "(04)|(08)")]
+dim(counts2)
+head(counts2)
+```
+
+```{r}
+counts2 <- counts2 %>% as.data.frame() %>%
+  rownames_to_column("GeneID")
+head(counts2)
+```
+
+
+```{r}
+write_csv(counts2, "~/git/BIS180L_templates_2021/Template-Final2021/input/RootCounts.csv.gz")
+write_csv(counts2, "~/git/BIS180L_keys_2021/KEY-final/input/RootCounts.csv.gz")
+```
+
+
