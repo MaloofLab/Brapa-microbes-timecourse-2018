@@ -198,27 +198,49 @@ getcorMR <- function(rna, asv) {
 
 graph functions
 ```{r mr_subgraphs, echo=FALSE, cache.lazy=FALSE, warning=FALSE, eval=TRUE }
-get.mr.subgraph <- function(mr.cutoff,mr.matrix,annotation=NULL,neighborhood,order=1) {
-  #function to extract graph at a specificed correlation cutoff
-  gene.mr.tmp <- mr.matrix
-  gene.mr.tmp[abs(gene.mr.tmp) > mr.cutoff] <- 0
-  gene.mr.tmp[is.na(gene.mr.tmp)] <- 0 #important! otherwise vertices with NA edges are connected
+get.mr.subgraph <- function(mr.cutoff,mr.matrix,annotation=NULL,order=1, ASV.centered=TRUE) {
+  #function to extract graph at a specified correlation cutoff
+  mr.tmp <- mr.matrix
+  mr.tmp[abs(mr.tmp) > mr.cutoff] <- 0
+  mr.tmp[is.na(mr.tmp)] <- 0 #important! otherwise vertices with NA edges are connected
   
-  gene.graph <- graph.adjacency(adjmatrix = gene.mr.tmp,
+  graph <- graph.adjacency(adjmatrix = mr.tmp,
                                 mode="undirected",
                                 weighted="mr",
                                 diag=FALSE)
   
-  sub.graphs <- graph.neighborhood(gene.graph,order=order,nodes=neighborhood) #for each node of interest get all other nodes within order of order
+  # vector of ASVs that are in this graph
+  asvs <- V(graph) %>% names() %>% str_subset("ASV")
+  
+  # vector of genes that are in the graph
+  genes <- V(graph) %>% names() %>% str_subset("Bra")
+  
+  # edges that connect an ASV to a gene:
+  e.asv.gene <- graph %>% E() %>% extract(.inc(asvs)) %>% extract(.inc(genes))
+  
+
+
+  if (ASV.centered) {
+  # asvs that are connected to a gene
+  g.asvs <- e.asv.gene %>% attr("vnames") %>% str_extract("ASV[0-9]*")
+  # get any graph that contains an ASV nodes connected to a gene and all other nodes within ORDER of those
+  sub.graphs <- graph.neighborhood(graph,order=order,nodes=g.asv)
+  } else {
+    g.genes <-  e.asv.gene %>% attr("vnames") %>% str_extract("Bra.*C")
+     sub.graphs <- graph.neighborhood(graph,order=order,nodes=g.genes)
+ 
+  }
   
   #get combined list of vertices...
   
   sub.vertices <- unique(names(unlist(lapply(sub.graphs, V))))
   
-  combined.sub.graph <- induced_subgraph(gene.graph,sub.vertices)
+  combined.sub.graph <- induced_subgraph(graph,sub.vertices)
+  
+  asv.sub.vertices <- sub.vertices %>% str_subset("ASV")
   
   V(combined.sub.graph)$color <- "lightblue"
-  V(combined.sub.graph)[neighborhood]$color <- "red"
+  V(combined.sub.graph)[asv.sub.vertices]$color <- "red"
   if(!is.null(annotation)) V(combined.sub.graph)$gene <- 
     annotation$At_symbol[match(V(combined.sub.graph)$name,annotation$name)]
   return(combined.sub.graph)
@@ -245,13 +267,15 @@ annotateEdges <- function(graph, cormat, edge.colors=c("magenta","green")) {#col
   return(graph)
 }
 
-plot.graph <- function(graph, title) {
+plot.graph <- function(graph, title, vertex.size=5) {
   plot(graph,
-       layout = layout_with_kk, 
-       vertex.label = ifelse(is.na(V(graph)$gene)|V(graph)$gene=="",
-                             V(graph)$name,
-                             paste(V(graph)$gene,V(graph)$name,sep="\n")),
-       vertex.label.cex=1,
+       #layout = layout_with_fr, 
+#       vertex.label = ifelse(is.na(V(graph)$gene)|V(graph)$gene=="",
+#                            V(graph)$name,
+#                             paste(V(graph)$gene,V(graph)$name,sep="\n")),
+#       vertex.label.cex=1,
+vertex.label=NA,
+vertex.size=vertex.size,
        main=title)
 }
 ```
@@ -273,24 +297,24 @@ MR_live$cormat[1:10,1:10]
 Get graphs at different MR.  First set up new tibble to hold them.
 
 ```{r}
-graphstibble <- tibble(cutoff=c(10, 15, 25) )
+graphstibble <- tibble(cutoff=c(1, 3, 5, 10) )
 graphstibble
 ```
 
-Make graphs and pull out subgraphs centered on ASVs
+Make graphs and pull out subgraphs centered on ASVs that have an edge with a gene
+
 ```{r}
 graphstibble <- graphstibble %>%
   mutate(graph=map(cutoff, ~ get.mr.subgraph(
                       mr.cutoff=.x,
                       mr.matrix=MR_live$MR,
                       annotation = annotation,
-                      neighborhood = colnames(asv_live_small)
+                      ASV.centered = FALSE
                     )),
          nodes=map(graph, ~ V(.)$name))
 ```
 
 
-## stopped here...modify below....
 
 annotate graph edges with correlation and direction.
 ```{r}
@@ -310,12 +334,96 @@ graphstibble %>%
   mutate(title=str_c("MR", cutoff, sep="_"))
 ```
 
-get max and mean correlation to leaf for each graph
+
 ```{r}
+pdf("../output/ASV_graphs.pdf",height=12,width=12)
+graphstibble %>%
+  mutate(plot=map2(graph, title, plot.graph))
+dev.off()
+```
+```{r, fig.width=9,fig.height=9}
+graphstibble$graph[[3]] %>% plot(vertex.label=NA, vertex.size=5)
+```
+
+get max and mean correlation between a gene and ASV for each graph
+```{r}
+maxcor <- function(g) {
+  g.asv <- V(g) %>% names() %>% str_subset("ASV")
+  g.gene <- V(g) %>% names() %>% str_subset("Bra")
+  E(g) %>% 
+    extract(.inc(g.asv)) %>% 
+    extract(.inc(g.gene)) %>%
+    use_series("cor") %>%
+    abs() %>%
+    max() %>%
+    round(3)
+}
+
+meancor <- function(g) {
+  g.asv <- V(g) %>% names() %>% str_subset("ASV")
+  g.gene <- V(g) %>% names() %>% str_subset("Bra")
+  E(g) %>% 
+    extract(.inc(g.asv)) %>% 
+    extract(.inc(g.gene)) %>%
+    use_series("cor") %>%
+    abs() %>%
+    mean() %>%
+    round(3)
+}
+
+
 graphstibble <- graphstibble %>%
-  mutate(maxcor=map_dbl(graph, ~ E(.)[.inc("leaf_avg_std")]$cor %>% abs() %>% max() %>% round(3)),
-         meancor=map_dbl(graph, ~E(.)[.inc("leaf_avg_std")]$cor %>% abs() %>% mean() %>% round(3)),
+  mutate(maxcor=map_dbl(graph, maxcor),
+         meancor=map_dbl(graph, meancor),
          nNode=map_int(graph, ~length(V(.))))
 graphstibble %>% select(title, maxcor, meancor, nNode)
 ```
 
+## next randomize it...
+
+
+```{r}
+nperms <- 100
+cutoffs <- c(1,3,5,10)
+
+getcorMRperm <- function(perm, rna, asv) {
+  print(perm)
+  getcorMR(rna=apply(rna, 2, sample),
+           asv=apply(asv, 2, sample))
+}
+
+graphstibblepermute <- tibble(perm=1:nperms, list(cutoffs) ) %>%
+  mutate(MR_live=map(perm, getcorMRperm, rna=tmpRNA, asv=tmpASV))
+
+
+
+# Make graphs and pull out subgraphs centered on ASVs that have an edge with a gene
+graphstibblepermute <- graphstibblepermute %>%
+  mutate(graph=map(cutoff, ~ get.mr.subgraph(
+                      mr.cutoff=.x,
+                      mr.matrix=MR_live$MR,
+                      annotation = annotation,
+                      ASV.centered = FALSE
+                    )),
+         nodes=map(graph, ~ V(.)$name))
+
+# annotate graph edges with correlation and direction.
+graphstibblepermute <- graphstibblepermute %>%
+  mutate(graph=map(graph, ~ annotateEdges(
+                      graph=.x,
+                      cormat = MR_live$cormat)
+  ))
+
+# Add useful title
+
+graphstibblepermute <- 
+graphstibblepermute %>%
+  mutate(title=str_c("MR", cutoff, sep="_"))
+
+# get max and mean correlation between a gene and ASV for each graph
+graphstibblepermute <- graphstibblepermute %>%
+  mutate(maxcor=map_dbl(graph, maxcor),
+         meancor=map_dbl(graph, meancor),
+         nNode=map_int(graph, ~length(V(.))))
+graphstibblepermute %>% select(title, maxcor, meancor, nNode)
+```
