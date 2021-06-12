@@ -424,6 +424,11 @@ graphstibblepermute %>%
 ```
 
 ```{r}
-graphstibble %>% select(-graph,-nodes,-title, nNode, maxcor, meancor)
+graphstibble %>% select(-graph,-nodes,-title) %>%
+  select(cutoff, nNode, maxcor, meancor)
+```
+
+```{r}
+save(graphstibble, graphstibblepermute, file="../output/MRgraphs.Rdata")
 ```
 
