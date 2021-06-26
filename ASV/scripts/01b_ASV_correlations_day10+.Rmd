@@ -139,15 +139,15 @@ dim(asv_counts_small)
 ```
 
 ```{r}
-asv_live <- asv_counts[samples_merged$inoc=="SBC_OLD",]
-sparsity_live <- apply(asv_live, 2, function(x) sum(x==0)/length(x))
-hist(sparsity_live)
-sparsity_live[sparsity_live>0.9] %>% hist()
+asv_live10 <- asv_counts[samples_merged$inoc=="SBC_OLD" & as.numeric(samples_merged$days_grown)>=10,]
+sparsity_live10 <- apply(asv_live10, 2, function(x) sum(x==0)/length(x))
+hist(sparsity_live10)
+sparsity_live10[sparsity_live10>0.9] %>% hist()
 ```
 
 ```{r}
-asv_live_small <- asv_live[,sparsity_live< .8]
-dim(asv_live_small)
+asv_live10_small <- asv_live10[,sparsity_live10 < .8]
+dim(asv_live10_small)
 ```
 
 
@@ -286,13 +286,13 @@ plot.graph <- function(graph, title, vertex.size=5) {
 
 get the MR
 ```{r}
-rna_live <- rna[samples_merged$inoc=="SBC_OLD",]
-system.time(MR_live <- getcorMR(rna=rna_live, asv=asv_live_small))
+rna_live10 <- rna[samples_merged$inoc=="SBC_OLD" & as.numeric(samples_merged$days_grown) >= 10,]
+system.time(MR_live10 <- getcorMR(rna=rna_live10, asv=asv_live10_small))
 ```
 
 ```{r}
-MR_live$cormat[1:10,1:10]
-#MR_live$cormat[order(abs(MR_live$cormat[,1]),decreasing = TRUE),1] %>% head(100)
+MR_live10$cormat[1:10,1:10]
+#MR_live10$cormat[order(abs(MR_live10$cormat[,1]),decreasing = TRUE),1] %>% head(100)
 ```
 
 Get graphs at different MR.  First set up new tibble to hold them.
@@ -308,7 +308,7 @@ Make graphs and pull out subgraphs centered on ASVs that have an edge with a gen
 graphstibble <- graphstibble %>%
   mutate(graph=map(cutoff, ~ get.mr.subgraph(
     mr.cutoff=.x,
-    mr.matrix=MR_live$MR,
+    mr.matrix=MR_live10$MR,
     annotation = annotation,
     ASV.centered = FALSE
   )),
@@ -322,7 +322,7 @@ annotate graph edges with correlation and direction.
 graphstibble <- graphstibble %>%
   mutate(graph=map(graph, ~ annotateEdges(
     graph=.x,
-    cormat = MR_live$cormat)
+    cormat = MR_live10$cormat)
   ))
 
 ```
@@ -337,7 +337,7 @@ graphstibble <-
 
 
 ```{r}
-pdf("../output/ASV_graphs.pdf",height=12,width=12)
+pdf("../output/ASV_graphs_live10.pdf",height=12,width=12)
 graphstibble %>%
   mutate(plot=map2(graph, title, plot.graph))
 dev.off()
@@ -380,11 +380,44 @@ graphstibble <- graphstibble %>%
 graphstibble %>% select(title, maxcor, meancor, nNode)
 ```
 
+### which nodes have max correlation
+
+```{r}
+maxcornodes <- function(g) {
+  g.asv <- V(g) %>% names() %>% str_subset("ASV")
+  g.gene <- V(g) %>% names() %>% str_subset("Bra")
+  max_edge <- E(g) %>% 
+    extract(.inc(g.asv)) %>% 
+    extract(.inc(g.gene)) %>%
+    use_series("cor") %>%
+    abs() %>%
+    which.max()
+  E(g)[max_edge] %>% attr("vnames") %>% str_split(fixed("|")) %>% unlist()
+}
+```
+
+```{r}
+graphstibble <- graphstibble %>%
+  mutate(max_cor_nodes=map(graph, maxcornodes))
+```
+
+```{r}
+graphstibble$max_cor_nodes
+```
+
+```{r}
+cbind(rna_live10[,"BraA07g000630.3C"], asv_live10_small[,"ASV86"]) %>% cor(method = "pearson")
+cbind(rna_live10[,"BraA07g000630.3C"], asv_live10_small[,"ASV86"]) %>% cor(method = "spearman")
+cbind(rna_live10[,"BraA07g000630.3C"], asv_live10_small[,"ASV86"]) %>% cor(method = "kendall")
+
+```
+
+
 ## next randomize it...
 
 
 ```{r}
-nperms <- 100
+nperms <- 2
 cutoffs <- c(1,3,5,10)
 
 doPerm <- function(perm, cutoffs, rna, asv) {
@@ -411,14 +444,14 @@ doPerm <- function(perm, cutoffs, rna, asv) {
 }
 
 graphstibblepermute <- tibble(perm=1:nperms, cutoffs=list(cutoffs) ) %>%
-  mutate(MR_live=map2(perm, cutoffs, doPerm, rna=rna_live, asv=asv_live_small))
+  mutate(MR_live10=map2(perm, cutoffs, doPerm, rna=rna_live10, asv=asv_live10_small))
 
 graphstibblepermute
 ```
 
 ```{r}
 graphstibblepermute %>%
-  unnest(cutoffs, MR_live) %>%
+  unnest(cutoffs, MR_live10) %>%
   select(-perm, -cutoffs) %>%
   group_by(cutoff) %>%
   dplyr::summarize(across(,.fns = quantile, 0.95, .names="{.col}_perm95"))
