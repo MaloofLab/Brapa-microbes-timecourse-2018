@@ -174,7 +174,7 @@ julia_command("myrank = function(x)
 
 juliaCorMR <- function(combined) {
   julia_assign("combined", as.matrix(combined))
-  julia_command("cormat = cor(combined)")
+  julia_command("cormat = corkendall(combined)")
   cormat <- julia_eval("cormat")
   dimnames(cormat) <- list(colnames(combined), colnames(combined))
   
