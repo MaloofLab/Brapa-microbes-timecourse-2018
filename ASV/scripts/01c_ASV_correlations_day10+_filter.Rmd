@@ -1,0 +1,474 @@
+---
+title: "ASV correlations"
+author: "Julin Maloof"
+date: "5/19/2021"
+output: html_document
+---
+
+NOT YET RUN.  IDEA IS TO PREFILTER GENES BASED ON VARIANCE.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(phyloseq)
+library(magrittr)
+library(knitr)
+library(igraph)
+library(plyr)
+library(tidyverse)
+library(JuliaCall)
+library(UpSetR)
+julia_setup()
+julia_install_package_if_needed("StatsBase")
+julia_library("StatsBase")
+julia_library("LinearAlgebra")
+```
+
+## get ASV (from Scott Klasek)
+```{r}
+ps<- readRDS(file="../input/rhizo.ps")
+```
+
+
+```{r}
+asv_counts <- otu_table(ps)# the read count data
+dim(asv_counts)
+head(asv_counts[,1:10])
+```
+
+
+```{r}
+taxa <- tax_table(ps) # taxonomy data
+dim(taxa)
+head(taxa)
+```
+
+
+```{r}
+asv_samples <- sample_data(ps) %>% # sample information
+  as_tibble() %>%
+  mutate(ID=rownames(sample_data(ps)),
+         days_grown=str_pad(days_grown, 2, pad="0"), # get things formatted the same as the RNA names
+         block=str_c("blk", block),
+         inoc={str_replace(inoc, "Autoclaved", "ATM_BLANK") %>%
+             str_replace("Inoculated", "SBC_OLD")},
+         timeofday={
+           str_replace(timeofday, "9:00 AM", "1_morn") %>%
+             str_replace("14:00 PM", "2_afternoon") %>%
+             str_replace("18:00 PM", "3_evening_5.30") %>%
+             str_replace("22:00 PM", "4_night_1") %>%
+             str_replace("4:00 AM", "5_night_2")},
+         sampleID=str_c(inoc,days_grown,timeofday,block, sep = "-")) %>%
+  select("ID", everything())
+dim(asv_samples)
+asv_samples
+```
+
+## get annotation
+```{r}
+annotation <- read_csv("../../RNAseq/Annotation_copy/output/v3.0annotation/Brapa_V3.0_annotated.csv") %>%
+  select(-X1)
+annotation
+```
+
+## get RNA
+
+```{r}
+cpm <- read_tsv("../../RNAseq/output/log2cpmSample.txt.gz")
+head(cpm[,1:10])
+dim(cpm)
+```
+
+### wrangle it
+
+transpose and fix rownames
+```{r}
+rna <- cpm %>% 
+  select(-gene) %>% 
+  (t) %>%
+  set_colnames(cpm$gene)
+
+rownames(rna) <- str_replace(rownames(rna), "_blk", "-blk")
+rna[1:5,1:2]
+```
+
+make a sample info sheet
+
+```{r}
+rna_samples <- tibble(sample=rownames(rna)) %>%
+  mutate(sampleID = str_remove(sample, "^[a-zA-Z]*-")) %>%
+  separate(sample, sep="-", into = c("genotype", "inoc", "days_grown", "timeofday", "block"), remove = FALSE) %>%
+  select(-sample, sampleID, everything())
+rna_samples
+```
+## get ASV and RNA order to match
+
+```{r}
+samples_merged <- inner_join(asv_samples, rna_samples) %>%
+  select(ASV_ID=ID, RNA_ID=sample, sampleID, everything())
+samples_merged
+```
+
+
+```{r}
+rna <- rna[samples_merged$RNA_ID,]
+head(rna[,1:10])
+asv_counts <- asv_counts[samples_merged$ASV_ID,]
+head(asv_counts[,1:10])
+```
+
+Let's give them the same rownames
+```{r}
+all(rownames(rna)==samples_merged$RNA_ID) # double check!
+rownames(rna) <- samples_merged$ASV_ID
+```
+
+
+## filter ASVs
+```{r}
+sparsity <- apply(asv_counts, 2, function(x) sum(x==0)/length(x))
+hist(sparsity)
+sparsity[sparsity>0.9] %>% hist()
+```
+
+```{r}
+asv_counts_small <- asv_counts[,sparsity< .8]
+dim(asv_counts_small)
+```
+
+```{r}
+asv_live10 <- asv_counts[samples_merged$inoc=="SBC_OLD" & as.numeric(samples_merged$days_grown)>=10,]
+sparsity_live10 <- apply(asv_live10, 2, function(x) sum(x==0)/length(x))
+hist(sparsity_live10)
+sparsity_live10[sparsity_live10>0.9] %>% hist()
+```
+
+```{r}
+asv_live10_small <- asv_live10[,sparsity_live10 < .8]
+dim(asv_live10_small)
+```
+
+
+## functions
+
+MR matrix creation functions
+```{r}
+subsetRNA <- function(rna, cutoff=10000) { 
+  if(ncol(rna) > nrow(rna)) { # genes in columns
+    cv <- apply(rna, 2, function(x) sd(x)/abs(mean(x)))
+    cutoff <- sort(cv, decreasing = TRUE)[cutoff]
+    rna <- rna %>% magrittr::extract(,cv>=cutoff)
+  } else { # genes in rows
+    cv <- apply(rna[,-1], 1, function(x) sd(x)/abs(mean(x)))
+    cutoff <- sort(cv, decreasing = TRUE)[cutoff]
+    rna <- rna %>% filter(cv>=cutoff)
+  }
+  return(rna)
+}
+
+julia_command("myrank = function(x)
+                  ordinalrank( abs.(x); rev=true)
+              end")
+
+juliaCorMR <- function(combined) {
+  julia_assign("combined", as.matrix(combined))
+  julia_command("cormat = corkendall(combined)")
+  cormat <- julia_eval("cormat")
+  dimnames(cormat) <- list(colnames(combined), colnames(combined))
+  
+  julia_command("cormat[diagind(cormat)] .= 0") # set diagonal to 0 so we don't count self ID in MR
+  julia_command("rankmat = mapslices(myrank, cormat; dims=1)")
+  MR <- julia_eval("sqrt.(rankmat .* transpose(rankmat))")
+  dimnames(MR) <- list(colnames(cormat), colnames(cormat))
+  
+  return(list(cormat=cormat, MR=MR))
+}
+
+# The main function for MR matrix
+getcorMR <- function(rna, asv) {
+  rna <- subsetRNA(rna)
+  try(if(!all(rownames(asv)==rownames(rna))) stop("row names of rna and asv don't match"))
+  combined <- cbind(asv,rna)
+  rm(rna)
+  gc()
+  return(juliaCorMR(combined))
+}
+```
+
+graph functions
+```{r mr_subgraphs, echo=FALSE, cache.lazy=FALSE, warning=FALSE, eval=TRUE }
+get.mr.subgraph <- function(mr.cutoff,mr.matrix,annotation=NULL,order=1, ASV.centered=TRUE) {
+  #function to extract graph at a specified correlation cutoff
+  mr.tmp <- mr.matrix
+  mr.tmp[abs(mr.tmp) > mr.cutoff] <- 0
+  mr.tmp[is.na(mr.tmp)] <- 0 #important! otherwise vertices with NA edges are connected
+  
+  graph <- graph.adjacency(adjmatrix = mr.tmp,
+                           mode="undirected",
+                           weighted="mr",
+                           diag=FALSE)
+  
+  # vector of ASVs that are in this graph
+  asvs <- V(graph) %>% names() %>% str_subset("ASV")
+  
+  # vector of genes that are in the graph
+  genes <- V(graph) %>% names() %>% str_subset("Bra")
+  
+  # edges that connect an ASV to a gene:
+  e.asv.gene <- graph %>% E() %>% extract(.inc(asvs)) %>% extract(.inc(genes))
+  
+  
+  
+  if (ASV.centered) {
+    # asvs that are connected to a gene
+    g.asvs <- e.asv.gene %>% attr("vnames") %>% str_extract("ASV[0-9]*")
+    # get any graph that contains an ASV nodes connected to a gene and all other nodes within ORDER of those
+    sub.graphs <- graph.neighborhood(graph,order=order,nodes=g.asv)
+  } else {
+    g.genes <-  e.asv.gene %>% attr("vnames") %>% str_extract("Bra.*C")
+    sub.graphs <- graph.neighborhood(graph,order=order,nodes=g.genes)
+    
+  }
+  
+  #get combined list of vertices...
+  
+  sub.vertices <- unique(names(unlist(lapply(sub.graphs, V))))
+  
+  combined.sub.graph <- induced_subgraph(graph,sub.vertices)
+  
+  asv.sub.vertices <- sub.vertices %>% str_subset("ASV")
+  
+  V(combined.sub.graph)$color <- "lightblue"
+  V(combined.sub.graph)[asv.sub.vertices]$color <- "red"
+  if(!is.null(annotation)) V(combined.sub.graph)$gene <- 
+    annotation$At_symbol[match(V(combined.sub.graph)$name,annotation$name)]
+  return(combined.sub.graph)
+}
+```
+
+plotting functions
+```{r plotfunctions, echo=FALSE, cache.lazy=FALSE, eval=TRUE }
+annotateEdges <- function(graph, cormat, edge.colors=c("magenta","green")) {#color edges by correlation sign and set width
+  
+  E(graph)$cor  <-  E(graph) %>% 
+    attr("vnames") %>% 
+    tibble(edge=.) %>% 
+    separate(edge,into=c("node1","node2"),remove = FALSE,sep="\\|") %>%
+    rowwise() %>% 
+    mutate(cor=map2_dbl(node1, node2, ~ cormat[.x,.y])) %>%
+    select(cor) %>%
+    unlist()
+  
+  E(graph)$color <- ifelse(E(graph)$cor> 0, edge.colors[1], edge.colors[2])
+  
+  E(graph)$width <- rank(E(graph)$mr)^(1/4)
+  
+  return(graph)
+}
+
+plot.graph <- function(graph, title, vertex.size=5) {
+  plot(graph,
+       #layout = layout_with_fr, 
+       #       vertex.label = ifelse(is.na(V(graph)$gene)|V(graph)$gene=="",
+       #                            V(graph)$name,
+       #                             paste(V(graph)$gene,V(graph)$name,sep="\n")),
+       #       vertex.label.cex=1,
+       vertex.label=NA,
+       vertex.size=vertex.size,
+       main=title)
+}
+```
+
+
+## make graphs for live
+
+get the MR
+```{r}
+rna_live10 <- rna[samples_merged$inoc=="SBC_OLD" & as.numeric(samples_merged$days_grown) >= 10,]
+system.time(MR_live10 <- getcorMR(rna=rna_live10, asv=asv_live10_small))
+```
+
+```{r}
+MR_live10$cormat[1:10,1:10]
+#MR_live10$cormat[order(abs(MR_live10$cormat[,1]),decreasing = TRUE),1] %>% head(100)
+```
+
+Get graphs at different MR.  First set up new tibble to hold them.
+
+```{r}
+graphstibble <- tibble(cutoff=c(1, 3, 5) )
+graphstibble
+```
+
+Make graphs and pull out subgraphs centered on ASVs that have an edge with a gene
+
+```{r}
+graphstibble <- graphstibble %>%
+  mutate(graph=map(cutoff, ~ get.mr.subgraph(
+    mr.cutoff=.x,
+    mr.matrix=MR_live10$MR,
+    annotation = annotation,
+    ASV.centered = FALSE
+  )),
+  nodes=map(graph, ~ V(.)$name))
+```
+
+
+
+annotate graph edges with correlation and direction.
+```{r}
+graphstibble <- graphstibble %>%
+  mutate(graph=map(graph, ~ annotateEdges(
+    graph=.x,
+    cormat = MR_live10$cormat)
+  ))
+
+```
+
+
+Add useful title
+```{r}
+graphstibble <- 
+  graphstibble %>%
+  mutate(title=str_c("MR", cutoff, sep="_"))
+```
+
+
+```{r}
+pdf("../output/ASV_graphs_live10.pdf",height=12,width=12)
+graphstibble %>%
+  mutate(plot=map2(graph, title, plot.graph))
+dev.off()
+```
+```{r, fig.width=9,fig.height=9}
+graphstibble$graph[[3]] %>% plot(vertex.label=NA, vertex.size=5)
+```
+
+get max and mean correlation between a gene and ASV for each graph
+```{r}
+maxcor <- function(g) {
+  g.asv <- V(g) %>% names() %>% str_subset("ASV")
+  g.gene <- V(g) %>% names() %>% str_subset("Bra")
+  E(g) %>% 
+    extract(.inc(g.asv)) %>% 
+    extract(.inc(g.gene)) %>%
+    use_series("cor") %>%
+    abs() %>%
+    max() %>%
+    round(3)
+}
+
+meancor <- function(g) {
+  g.asv <- V(g) %>% names() %>% str_subset("ASV")
+  g.gene <- V(g) %>% names() %>% str_subset("Bra")
+  E(g) %>% 
+    extract(.inc(g.asv)) %>% 
+    extract(.inc(g.gene)) %>%
+    use_series("cor") %>%
+    abs() %>%
+    mean() %>%
+    round(3)
+}
+
+
+graphstibble <- graphstibble %>%
+  mutate(maxcor=map_dbl(graph, maxcor),
+         meancor=map_dbl(graph, meancor),
+         nNode=map_int(graph, ~length(V(.))))
+graphstibble %>% select(title, maxcor, meancor, nNode)
+```
+
+### which nodes have max correlation
+
+```{r}
+maxcornodes <- function(g) {
+  g.asv <- V(g) %>% names() %>% str_subset("ASV")
+  g.gene <- V(g) %>% names() %>% str_subset("Bra")
+  max_edge <- E(g) %>% 
+    extract(.inc(g.asv)) %>% 
+    extract(.inc(g.gene)) %>%
+    use_series("cor") %>%
+    abs() %>%
+    which.max()
+  E(g)[max_edge] %>% attr("vnames") %>% str_split(fixed("|")) %>% unlist()
+}
+```
+
+```{r}
+graphstibble <- graphstibble %>%
+  mutate(max_cor_nodes=map(graph, maxcornodes))
+```
+
+```{r}
+graphstibble$max_cor_nodes
+```
+
+```{r}
+cbind(rna_live10[,"BraA04g024180.3C"], asv_live10_small[,"ASV1591"]) %>% cor(method = "pearson")
+cbind(rna_live10[,"BraA04g024180.3C"], asv_live10_small[,"ASV1591"]) %>% cor(method = "spearman")
+cbind(rna_live10[,"BraA04g024180.3C"], asv_live10_small[,"ASV1591"]) %>% cor(method = "kendall")
+
+```
+
+```{r}
+cbind(rna_live10[,"BraA04g024180.3C"], asv_live10_small[,"ASV1591"])
+```
+
+
+## next randomize it...
+
+
+```{r}
+nperms <- 100
+cutoffs <- c(1,3,5)
+
+doPerm <- function(perm, cutoffs, rna, asv) {
+  print(perm)
+  MR <- getcorMR(rna=apply(rna, 2, sample), # get MR matrix and correlation from permuted samples
+                 asv=apply(asv, 2, sample))
+  
+  graphstibble <- tibble(cutoff=unlist(cutoffs))
+  
+  graphstibble <- graphstibble %>%
+    mutate(graph=map(cutoff, # make graph and pull subgraphs
+                     get.mr.subgraph, 
+                     mr.matrix=MR$MR, 
+                     annotation=annotation, 
+                     ASV.centered = FALSE)) %>%
+    
+    mutate(graph=map(graph, annotateEdges, MR$cormat)) %>% # add correlation
+    
+    mutate(nNode=map_int(graph, ~ length(V(.)$name)), # graph stats
+           maxcor=map_dbl(graph, maxcor),
+           meancor=map_dbl(graph, meancor))
+  
+  graphstibble %>% select(-graph)
+}
+
+graphstibblepermute <- tibble(perm=1:nperms, cutoffs=list(cutoffs) ) %>%
+  mutate(MR_live10=map2(perm, cutoffs, doPerm, rna=rna_live10, asv=asv_live10_small))
+
+graphstibblepermute
+```
+
+```{r}
+graphstibblepermute %>%
+  unnest(c(cutoffs, MR_live10)) %>%
+  select(-perm, -cutoffs) %>%
+  group_by(cutoff) %>%
+  dplyr::summarize(across(,.fns = quantile, 0.95, .names="{.col}_perm95"))
+```
+
+```{r}
+graphstibble %>% select(-graph,-nodes,-title) %>%
+  select(cutoff, nNode, maxcor, meancor)
+```
+
+```{r}
+save(graphstibble, graphstibblepermute, file="../output/MRgraphs.Rdata")
+```
+
