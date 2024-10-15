@@ -1,0 +1,461 @@
+---
+title: "09_clustering"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: inline
+---
+
+Original script by Kazu, updated by Julin.  This version if for WGCNA only on the samples treated with microbes.
+
+```{r setup}
+getwd()
+knitr::opts_chunk$set(echo = TRUE,error=TRUE)
+library(tidyverse)
+library(Biostrings)
+library(goseq)
+library(GO.db)
+library(patchwork)
+conflicted::conflict_prefer("select", "dplyr")
+conflicted::conflict_prefer("filter", "dplyr")
+
+# read functions for expression graph
+#source("../tools_copy/Expression_pattern_graph.R")
+```
+
+get data
+
+```{r}
+load("../output/timecourseDGE.Rdata")
+cpm.timecourse.v3.0 <- cpm(dge) %>% as_tibble() %>% bind_cols(data.frame(transcript_ID=rownames(dge$counts)),.)
+cpm.timecourse.v3.0.log <- cpm(dge,log=TRUE) %>% as_tibble() %>% bind_cols(data.frame(transcript_ID=rownames(dge$counts)),.)
+
+sample.description.timecourse <- dge$samples %>% bind_cols(data.frame(sample=rownames(dge$samples)),.)
+```
+
+Filter to keep only live samples
+```{r}
+sample.description.timecourse.live <- sample.description.timecourse %>% filter(soil_trt=="SBC_OLD")
+sample.description.timecourse.live
+
+cpm.timecourse.v3.0.live <- cpm.timecourse.v3.0 %>% select(transcript_ID, all_of(sample.description.timecourse.live$sample))
+
+cpm.timecourse.v3.0.log.live <- cpm.timecourse.v3.0.log %>% select(transcript_ID, all_of(sample.description.timecourse.live$sample))
+
+```
+
+
+
+```{r}
+# filtering for selecting only expressed genes
+cpm.timecourse.v3.0.live <- cpm.timecourse.v3.0.live[rowSums(cpm.timecourse.v3.0.live[,-1]>5) >=14,] # 10% of libraries have
+dim(cpm.timecourse.v3.0.live) # [1] 21017   145
+
+# removing low expressed genes from cpm.timecourse.v3.0.log.live
+cpm.timecourse.v3.0.log.live <- cpm.timecourse.v3.0.log.live %>% filter(transcript_ID %in% cpm.timecourse.v3.0.live$transcript_ID)
+dim(cpm.timecourse.v3.0.log.live) #[1] 21017   289
+```
+
+# format data
+
+# use log transformed data
+```{r}
+co.var.df <- function(x) ( 100*apply(x,1,sd)/rowMeans(x) )
+
+cpm.timecourse.v3.0.log.live$cv <- co.var.df(cpm.timecourse.v3.0.log.live[,-1])
+
+cpm.timecourse.v3.0.log.live %>% arrange(desc(cv))
+
+b <- hist(log10(cpm.timecourse.v3.0.log.live$cv))
+b
+
+# use largeCV 
+cpm.timecourse.v3.0.log.live.largeCV <- cpm.timecourse.v3.0.log.live[abs(cpm.timecourse.v3.0.log.live$cv) > 10,] 
+
+dim(cpm.timecourse.v3.0.log.live.largeCV) # [1] 9499  146
+
+hist(log10(cpm.timecourse.v3.0.log.live.largeCV$cv))
+
+cpm.timecourse.v3.0.log.live.largeCV <- cpm.timecourse.v3.0.log.live.largeCV %>%
+  select(-cv)
+###########
+
+write_csv(cpm.timecourse.v3.0.log.live.largeCV,file=file.path("..","output","cpm.timecourse.v3.0.log.live.largeCV.csv.gz"))
+```
+
+# WGCNA
+## co-expression analysis by WGCNA
+```{r eval=TRUE}
+# The following setting is important, do not omit.
+library(WGCNA) 
+options(stringsAsFactors = FALSE)
+```
+
+```{r eval=TRUE}
+cpm.timecourse.v3.0.log.live.largeCV <- read_csv(file.path("..","output","cpm.timecourse.v3.0.log.live.largeCV.csv.gz"))
+
+# 
+datExpr <-t(cpm.timecourse.v3.0.log.live.largeCV[,-1])
+
+# Choose a set of soft-thresholding powers
+powers = c(c(1:9), seq(from = 10, to=20, by=2))
+sft = pickSoftThreshold(datExpr, powerVector = powers, verbose = 5)  
+
+# Plot the results:
+#sizeGrWindow(9, 5)
+par(mfrow = c(1,2));
+cex1 = 0.9;
+# Scale-free topology fit index as a function of the soft-thresholding power
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+     main = paste("Scale independence"));
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     labels=powers,cex=cex1,col="red");
+# this line corresponds to using an R^2 cut-off of h
+abline(h=0.90,col="red")
+# Mean connectivity as a function of the soft-thresholding power
+plot(sft$fitIndices[,1], sft$fitIndices[,5],
+     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+     main = paste("Mean connectivity"))
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+
+# make modules 
+conflicted::conflicts_prefer(WGCNA::cor)
+net = blockwiseModules(datExpr, power = 5,
+                       maxBlockSize = 10000,
+                       networkType = "signed hybrid",
+                       TOMType = "unsigned", minModuleSize = 20,
+                       reassignThreshold = 0, mergeCutHeight = 0.25,
+                       numericLabels = TRUE, pamRespectsDendro = FALSE,
+                       saveTOMs = TRUE,
+                       saveTOMFileBase = "cpm.timecourse.v3.0.log.live.largeCV.TOM",
+                       verbose = 3)
+save(net,file="../output/WGCNA/net.cpm.timecourse.v3.0.log.live.largeCV.Rdata")  
+# open a graphics window
+pdf(file="../output/WGCNA/live_largeCV.dendrogram.pdf",width=10,height=8)
+# Convert labels to colors for plotting
+mergedColors = labels2colors(net$colors)
+# Plot the dendrogram and the module colors underneath
+plotDendroAndColors(net$dendrograms[[1]], mergedColors[net$blockGenes[[1]]],
+                    "Module colors",
+                    dendroLabels = FALSE, hang = 0.03,
+                    addGuide = TRUE, guideHang = 0.05)
+dev.off()
+# save parameters  
+moduleLabels = net$colors
+moduleColors = labels2colors(net$colors)
+MEs = net$MEs
+colnames(MEs) <- colnames(MEs) %>% str_remove("ME") %>% as.numeric() %>% labels2colors()
+geneTree = net$dendrograms[[1]]
+save(MEs, moduleLabels, moduleColors, geneTree,file ="../output/WGCNA/live.largeCV.RData")
+
+```
+
+```{r, eval=FALSE}
+load("../output/WGCNA/live.largeCV.RData")
+```
+
+
+```{r}
+
+# how many modules?
+table(net$colors)
+
+length(table(net$colors)) # 26 modules
+
+```
+
+  
+  
+# adding gene name, annotations
+```{r}
+cpm.timecourse.v3.0.log.live.largeCV.modules <- tibble(
+  transcript_ID=cpm.timecourse.v3.0.log.live.largeCV$transcript_ID,
+  module=moduleColors
+)
+
+
+## prep
+# annotation file for v3.0annotation
+
+Br.v3.0.At.BLAST <- read_csv(file.path("..","Annotation_copy","output","v3.0annotation","Brapa_v3.0_annotated.csv")) 
+
+# This annotation is redundant with name (Br grene). Eg 
+Br.v3.0.At.BLAST %>% filter(name=="BraA01g040570.3C")
+# reduce the redundancy (112418)
+Br.v3.0anno.At.BLAST.highscore <- Br.v3.0.At.BLAST %>% group_by(name) %>% slice_max(score)
+
+cpm.timecourse.v3.0.log.live.largeCV.modules.annotated <- cpm.timecourse.v3.0.log.live.largeCV.modules %>%
+  left_join(Br.v3.0anno.At.BLAST.highscore, by=c("transcript_ID" = "name")) %>%
+  select(AGI, At_symbol, At_full_name, At_short_description, At_Curator_summary, At_Computational_description, perc_ID, aln_length)
+
+```
+
+
+Gene lengths
+```{r, eval=FALSE}
+library(Biostrings)
+cDNAs <- readDNAStringSet("~/Sequences/ref_genomes/B_rapa/genome/V3.0/Brapa_genome_v3.0_cds.fasta.gz")
+CDS.lengths <- nchar(cDNAs)
+names(CDS.lengths) <- names(cDNAs)
+head(CDS.lengths)
+save(CDS.lengths, file="../Annotation_copy/output/v3.0annotation/Brapa_V3.0_CDS_lengths.Rdata")
+```
+
+Load lengths and annotations
+```{r}
+load("../Annotation_copy/output/v3.0annotation/Brgo.v3.0anno.Atgoslim.BP.list.Rdata") # object name `Brgo.v3.0anno.Atgoslim.BP.list`
+load("../Annotation_copy/output/v3.0annotation/Brapa_V3.0_CDS_lengths.Rdata") # object name `CDS.lengths`
+```
+
+Set up gene list
+```{r}
+all.expressed.genes.modules <- cpm.timecourse.v3.0.log.live %>% 
+  select(transcript_ID) %>%
+  full_join(cpm.timecourse.v3.0.log.live.largeCV.modules) %>%
+  mutate(module=ifelse(is.na(module), "none", module))
+
+all.expressed.genes.modules
+
+CDS.lengths <- CDS.lengths[all.expressed.genes.modules$transcript_ID]
+
+length(CDS.lengths) == nrow(all.expressed.genes.modules)
+```
+
+save some results
+
+```{r}
+all.expressed.genes.modules.ananotated <- all.expressed.genes.modules %>% 
+  left_join(Br.v3.0anno.At.BLAST.highscore, by=c("transcript_ID" = "name")) %>%
+  select(AGI, At_symbol, At_full_name, At_short_description, At_Curator_summary, At_Computational_description, perc_ID, aln_length)
+
+write_csv(all.expressed.genes.modules.ananotated, file = "../output/WGCNA/live.expressed.genes.modules.annotated_all.genes.csv")
+write_csv(all.expressed.genes.modules, file = "../output/WGCNA/live.expressed.genes.modules_all.genes.csv")
+
+```
+
+
+```{r, message=FALSE}
+modules.to.gene.vector <- function(module, module.df=all.expressed.genes.modules) {
+  module.vector <- as.numeric(module.df$module==module)
+  names(module.vector) <- module.df$transcript_ID
+  module.vector
+}
+
+# Calculate GO enrichment
+go.results <- tibble(module=sort(unique(all.expressed.genes.modules$module))) %>%
+  mutate(module.gene.vector = map(module, modules.to.gene.vector),
+         module.nullp = map(module.gene.vector, ~ nullp(.x, bias.data=CDS.lengths, plot.fit=FALSE)),
+         module.goseq = map(module.nullp, ~goseq(.x, 
+                                                 gene2cat = Brgo.v3.0anno.Atgoslim.BP.list , 
+                                                 test.cats = "GO:BP"))
+  )
+
+# Calculate FDR
+go.results <- go.results %>%
+  mutate(module.goseq = map(module.goseq,
+                            ~ mutate(.x, over_represented_FDR = p.adjust(over_represented_pvalue,
+                                                                         method = "fdr"))))
+
+# Filter based on FDR
+go.results <- go.results %>%
+  mutate(module.goseq = map(module.goseq,
+                            ~ filter(.x, over_represented_FDR <= 0.05)))
+
+# unnest
+go.results <- go.results %>% dplyr::select(module, module.goseq) %>%
+  unnest(module.goseq)
+
+write_csv(go.results, "../output/WGCNA/GO_ORA_WGCNA_live_genes.csv")
+
+go.results
+
+go.top6 <- go.results %>% 
+  group_by(module) %>%
+  slice_min(over_represented_FDR, n=6, with_ties = FALSE) %>%
+  summarize(top_6_go = str_c(term, sep=", ", collapse = ", ")) %>%
+  mutate(top_6_go = str_replace(top_6_go, "(^(.+?, ){3})","\\1\n"))
+
+go.top6
+```
+
+
+
+# Plotting modules
+
+set up data frame
+```{r}
+MEs.plot <- MEs %>% rownames_to_column("sample") %>%
+  full_join(sample.description.timecourse.live, .) %>%
+  select(-lib.size, -norm.factors, -block, -group, -group.1)
+
+MEs.plot
+```
+
+## Find modules reponsive to day or time 
+
+```{r}
+MEs.nest <- MEs.plot %>%
+  select(-genotype, -sample) %>%
+  pivot_longer(cols = -(soil_trt:sampling_time), names_to = "module", values_to = "ME_expression") %>%
+  arrange(module, sampling_day, sampling_time, soil_trt) %>%
+  nest(.by = module)
+
+MEs.nest
+```
+
+```{r}
+MEs.trt.aov <- MEs.nest %>%
+  mutate(aov = map(data, ~ aov(ME_expression ~ sampling_day*sampling_time, data = .x)),
+         terms = map(aov, broom::tidy)) %>%
+  select(module, terms) %>%
+  unnest(terms) %>%
+  filter(term != "Residuals")  %>%
+  mutate(term=str_remove_all(term, "_trt|sampling_")) # clean up the names
+
+# any terms not significant?
+
+MEs.trt.aov %>%
+  summarize(min_p = min(p.value), .by = term)
+
+# All Sig
+
+
+# Caclulate FDR
+
+MEs.trt.aov <- MEs.trt.aov %>%
+  group_by(term) %>%
+  mutate(fdr = p.adjust(p.value, method = "fdr")) %>%
+  ungroup()
+
+MEs.trt.aov %>%
+  summarize(min_fdr = min(fdr), .by = term) 
+
+```
+
+most significant day responders
+```{r}
+MEs.trt.aov %>%
+  filter(term=="day", fdr < 0.05) %>%
+  arrange(fdr)
+```
+
+most signficant time responders
+```{r}
+MEs.trt.aov %>%
+  filter(term=="time", fdr < 0.05) %>%
+  arrange(fdr)
+```
+
+## plot one set of fdrs
+
+```{r}
+MEs.trt.aov %>% filter(module=="blue")
+```
+
+
+```{r}
+pl1 <- MEs.trt.aov %>% filter(module=="blue") %>%
+  ggplot(aes(y=fdr, x = term)) +
+  geom_col(fill="blue") + 
+  scale_y_continuous(transform=c("log10", "reverse")) +
+  scale_x_discrete(limits = c("day", "time", "day:time")) +
+  geom_hline(yintercept = 0.05, linetype = 2) +
+  theme(axis.text.x = element_text(angle=90, hjust=1, vjust=.5)) 
+
+pl1
+```
+
+
+## plot 1 module time of day
+```{r}
+pl2 <- MEs.plot %>% 
+  filter(str_detect(.$sampling_day, "[34]")) %>%
+  ggplot(aes(x=sampling_time, y=blue, color=sampling_day)) +
+  geom_smooth(aes(group=sampling_day)) +
+  scale_color_viridis_d(name = "day") +
+  ggtitle("blue", go.top6[go.top6$module=="blue", "top_6_go"]) +
+  theme(plot.subtitle = element_text(size=9)) +
+  ylab("expression") +
+  xlab(NULL)
+
+pl2
+```
+## plot 1 module by day
+```{r}
+pl3 <- MEs.plot %>%
+  filter(sampling_time == "2_afternoon") %>%
+  ggplot(aes(x=sampling_day, y=blue)) +
+ # geom_boxplot() +
+  geom_smooth(aes(group=sampling_time)) +
+  ggtitle("blue") +
+  ylab("expression") +
+  xlab(NULL)
+
+pl3
+```
+
+```{r}
+(pl2 / pl3 | pl1) + plot_layout(widths = c(.8,.2))
+```
+
+
+## plotting function
+
+```{r}
+plot.me <- function(plot.module, plot.data, pvals){ 
+  module.sym <- as.name(plot.module) # needed to programmatically select this using !!
+  
+
+  pl1 <- pvals %>% filter(module==plot.module) %>%
+    ggplot(aes(y = fdr, x = term)) +
+    geom_col(fill = plot.module) + 
+    scale_y_continuous(transform=c("log10", "reverse")) +
+    scale_x_discrete(limits = c("day", "time", "day:time")) +
+    geom_hline(yintercept = 0.05, linetype = 2) +
+    theme(axis.text.x = element_text(angle=90, hjust=1, vjust=.5)) 
+  
+  pl2 <-  plot.data %>% 
+    filter(str_detect(.$sampling_day, "[34]")) %>%
+    ggplot(aes(x=sampling_time, y=!!module.sym, color=sampling_day)) +
+    geom_smooth(aes(group=sampling_day)) +
+    scale_color_viridis_d(name = "day") +
+    ggtitle(str_c(plot.module, ": time"), go.top6[go.top6$module==plot.module, "top_6_go"]) +
+    theme(plot.subtitle = element_text(size=9)) +
+    ylab("expression") +
+    xlab(NULL)
+  
+
+  
+  pl3 <- plot.data %>% 
+  filter(sampling_time == "2_afternoon") %>%
+  ggplot(aes(x=sampling_day, y=!!module.sym)) +
+  geom_smooth(aes(group=sampling_time)) +
+  ggtitle(str_c(plot.module, ": day")) +
+  ylab("expression") +
+  xlab(NULL)
+
+  (pl2 / pl3 | pl1) + plot_layout(widths = c(.8,.2))
+
+}
+
+# test it
+
+plot.me("black", MEs.plot, MEs.trt.aov)
+```
+
+```{r}
+pdf(file="../output/WGCNA/ME_plots_live_genes_power5.pdf", height=8, width=12)
+
+
+
+plotorder <- MEs.trt.aov %>% group_by(module) %>% slice_min(fdr, n=1, with_ties = FALSE) %>% arrange(fdr) %>% pull(module)
+  
+for(m in plotorder) {
+  print(plot.me(m, MEs.plot, MEs.trt.aov))
+}
+
+dev.off()
+```
+
