@@ -1,0 +1,340 @@
+---
+title: "20 Glucosinolate HeatMap"
+output: html_notebook
+---
+
+Make a heatmap that show changes in expression of Dan's GSL gene list
+
+```{r}
+library(tidyverse)
+library(gplots)
+library(edgeR)
+library(UpSetR)
+```
+
+
+## get gene IDs of GSL genes
+
+```{r}
+gsl.genes.agi <- read_csv("../input/GSL_genes_AGI.csv")
+gsl.genes.agi
+```
+
+```{r}
+annotation <- read_csv("../Annotation_copy/output/v3.0annotation/Brapa_V3.0_annotated.csv")
+annotation
+```
+
+```{r}
+gsl.genes <- gsl.genes.agi %>%
+  left_join(annotation, by="AGI") %>% 
+  filter(!is.na(name)) %>%
+  select(AGI, GeneName, Pathways, transcript_ID=name, perc_ID, aln_length, eval) %>%
+  group_by(transcript_ID) %>%
+  slice_min(eval) %>% ungroup()
+gsl.genes
+```
+
+
+
+```{r}
+load("../output/TimeCourseDGE_LRT.Rdata")
+```
+
+```{r}
+names(models)
+DEgenes <- models %>% 
+  mutate(toptags = map(lrt, ~ topTags(.,n=Inf)), #pull the DE gene info out of each model
+         toptags = map(toptags, ~ .$table), # get the table of DE info
+         toptags = map(toptags, ~ rownames_to_column(., "transcript_ID"))) %>%
+  unnest(toptags) %>%
+  group_by(transcript_ID) %>%
+  filter(min(FDR) < 0.1) %>% # only keep transcripts where at least one test is < 0.1
+  ungroup() %>%
+  semi_join(gsl.genes, by="transcript_ID") %>%
+  arrange(transcript_ID, FDR) %>% 
+  select(day_time, transcript_ID, logFC, FDR)
+DEgenes
+```
+
+## heat map of logFC
+
+add gene metadata back in
+
+
+```{r}
+DEgenes <- DEgenes %>% left_join(gsl.genes) %>%
+  mutate(label=str_c(transcript_ID,GeneName,Pathways, sep="_"),
+         label=str_remove(label, "Bra"),
+         label=str_remove(label, "\\.3C"))
+DEgenes
+```
+
+
+make a matrix from DEgenes
+```{r}
+DEgenes.mat.trunc <- DEgenes %>%
+  select(day_time, label, logFC) %>%
+ # mutate(logFC=ifelse(abs(logFC) > 4, sign(logFC)*4, logFC)) %>%
+  spread(key = day_time, value = logFC) %>%
+  as.data.frame() %>%
+  column_to_rownames("label") %>%
+  as.matrix()
+DEgenes.mat.trunc[1:10,1:10]
+```
+
+now, make the heat map
+
+```{r, fig.height=8, fig.width=8}
+DEgenes.mat.trunc %>% 
+  heatmap.2(Colv = FALSE,
+            keysize=1,
+            dendrogram="row",
+            sepwidth = c(0,0),
+            margins=c(7,12),
+            srtCol = 45,
+            col=colorRampPalette(c("green", "black", "magenta")),
+            trace = "none",
+           # cexCol = 2
+            #breaks=c(-8,-5, -2, -.5, .5, 2.5, 5, 10)
+  )
+
+```
+
+
+# STOPPED HERE
+
+heat map that clusters samples also:
+
+```{r, fig.height=10, fig.width=10}
+DEgenes.mat.trunc %>% 
+  heatmap.2(keysize=1,
+            dendrogram="both",
+            sepwidth = c(0,0),
+            labRow = FALSE,
+            mar=c(12,0),
+            srtCol = 45,
+            col=colorRampPalette(c("green", "black", "magenta")),
+            trace = "none",
+            cexCol = 2
+            #breaks=c(-8,-5, -2, -.5, .5, 2.5, 5, 10)
+  )
+
+```
+
+
+count number of samples that each gene is DE in, and summarize
+
+```{r}
+DEgenes %>%
+  summarize(n.timepoints=sum(FDR<0.05)) %>%
+  group_by(n.timepoints) %>%
+  summarize(n.genes=n()) %>%
+  ggplot(aes(x=n.timepoints, y=n.genes)) +
+  geom_col() +
+  ggtitle("Number of genes detected at 1, 2, 3, ..., n time points") +
+  ylab("number of genes") +
+  xlab("number of time points")
+```
+
+Upset Plots
+First calculate 0 / 1 table for DE at each time point
+
+```{r}
+DEgenes_01table_FDR0.05 <- DEgenes %>%
+  ungroup() %>%
+  mutate(DE=as.numeric(FDR<0.05)) %>%
+  select(-logFC, -FDR) %>%
+  spread(key = day_time, value = DE)  %>%
+  mutate_at(.vars = vars(-transcript_ID), as.integer)
+DEgenes_01table_FDR0.05
+```
+
+```{r, fig.width=8, fig.height=6}
+DEgenes_01table_FDR0.05  %>% as.data.frame() %>% upset(nsets = 23, nintersects = 100,
+                                                       order.by = "freq",
+                                                       keep.order = TRUE, 
+                                                       mb.ratio = c(.5,.5),
+                                                       sets=colnames(DEgenes_01table_FDR0.05)[-1])
+```
+
+
+```{r}
+DEgenes_01table_FDR0.1 <- models %>% 
+  mutate(toptags = map(lrt, ~ topTags(.,n=Inf)), #pull the DE gene info out of each model
+         toptags = map(toptags, ~ .$table), # get the table of DE info
+         toptags = map(toptags, ~ rownames_to_column(., "transcript_ID"))) %>%
+  unnest(toptags) %>%
+  group_by(transcript_ID) %>%
+  filter(min(FDR) < 0.1) %>% # only keep genes where FDR < 0.1 in at least one comparison.
+  arrange(transcript_ID, FDR) %>% 
+  select(day_time, transcript_ID, FDR) %>%
+  ungroup() %>%
+  mutate(DE=as.numeric(FDR<0.1)) %>%
+  select(-FDR) %>%
+  spread(key = day_time, value = DE) 
+DEgenes_01table_FDR0.1
+```
+
+```{r, fig.width=8, fig.height=6}
+DEgenes_01table_FDR0.1  %>% as.data.frame() %>% upset(nsets = 23, nintersects = 100,
+                                                      order.by = "freq",
+                                                      keep.order = TRUE, 
+                                                      mb.ratio = c(.5,.5),
+                                                      sets=colnames(DEgenes_01table_FDR0.1)[-1])
+```
+
+Look at overlap with exp13
+
+```{r}
+exp13 <- read_csv("../../Brapa_microbes/v3.0annotation/20180202-samples/output/DEG.e1.e3.complete.overlap.csv")
+exp13
+names(exp13)
+```
+
+
+
+```{r}
+exp13_timecourse_.1 <- exp13 %>%
+  select(transcript_ID, e1.root.trt5E_live.DEGs.add.rD.rFPsc.FDR0.1, e3.root.trtlive.DEGs.add.rD.rCR.v3.0anno.FDR0.1) %>%
+  full_join(DEgenes_01table_FDR0.1) 
+exp13_timecourse_.1[is.na(exp13_timecourse_.1)] <- 0
+exp13_timecourse_.1 <- exp13_timecourse_.1 %>%
+  mutate_at(.vars=vars(-transcript_ID), as.integer)
+exp13_timecourse_.1
+```
+
+
+```{r, fig.width=12, fig.height=8}
+exp13_timecourse_.1  %>% as.data.frame() %>% upset(nsets = 27,
+                                                   nintersects = 85,
+                                                   order.by = "freq",
+                                                   group.by = "sets",
+                                                   keep.order = TRUE, 
+                                                   mb.ratio = c(.4,.6),
+                                                   sets=colnames(exp13_timecourse_.1)[-1]
+)
+```
+
+
+```{r}
+exp13_timecourse_.1 %>% 
+  filter(e1.root.trt5E_live.DEGs.add.rD.rFPsc.FDR0.1==1,
+                               e3.root.trtlive.DEGs.add.rD.rCR.v3.0anno.FDR0.1==1,
+                               X14.5_night_2==1)
+```
+
+
+What about upsetr plot for DE genes anywhere in time course?
+
+```{r}
+exp13 %>% select(transcript_ID, e1.root.trt5E_live.DEGs.add.rD.rFPsc.FDR0.1, e3.root.trtlive.DEGs.add.rD.rCR.v3.0anno.FDR0.1) %>%
+  mutate(timecourse = as.numeric(transcript_ID %in% DEgenes_01table_FDR0.1$transcript_ID)) %>% 
+  as.data.frame() %>%
+  upset()
+```
+
+```{r}
+exp13 %>% select(transcript_ID, e1.root.trt5E_live.DEGs.add.rD.rFPsc.FDR0.05, e3.root.trtlive.DEGs.add.rD.rCR.v3.0anno.FDR0.05) %>%
+  mutate(timecourse = as.numeric(transcript_ID %in% DEgenes_01table_FDR0.05$transcript_ID)) %>% 
+  as.data.frame() %>%
+  upset()
+```
+
+
+
+```{r}
+overlap %>%
+  select(-total) %>%
+  gather(key="set", value="genes", -day_time) %>%
+  ggplot(aes(x=day_time, y=genes, fill=set)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle=90, hjust = 1, vjust=0.5))
+```
+
+## Followup:
+
+* histogram of FC, some concern about skewing
+* upset plots
+* heatmap with real expression values
+
+FC histogram 
+```{r}
+DEgenes %>%
+  ggplot(aes(x=logFC)) +
+  geom_histogram(bins=50)
+```
+
+## heat map of cpm
+
+```{r}
+load("../output/timecourseDGE.Rdata")
+```
+
+
+```{r}
+cpm <- cpmByGroup(dge)
+cpm <- log2(cpm+1)
+cpm <- cpm[unique(DEgenes$transcript_ID),]
+colnames(cpm) <- colnames(cpm) %>% str_remove("FPsc-") %>%
+  str_replace("(ATM_BLANK|SBC_OLD)-(.*)","\\2-\\1") %>%
+  str_replace("ATM_BLANK", "BLNK") %>%
+  str_replace("SBC_OLD", "SBC")
+colorder <- c({colnames(cpm) %>% str_subset("BLNK") %>% sort()},
+              {colnames(cpm) %>% str_subset("SBC") %>% sort()})
+cpm <- cpm[,colorder]
+dim(cpm)
+```
+
+```{r, fig.height=10, fig.width=10}
+cpm %>% 
+  heatmap.2(Colv = FALSE,
+            scale = "row",
+            keysize=1,
+            dendrogram="row",
+            sepwidth = c(0,0),
+            labRow = FALSE,
+            mar=c(12,0),
+            srtCol = 45,
+            col=colorRampPalette(c("green", "black", "magenta")),
+            trace = "none",
+            cexCol = 1,
+            breaks=c(-8,-3:3, 8)
+  )
+
+```
+
+Isn't really showing what I want.  The question is whether expression gets more similar because control becomes like treated or vice versa.
+
+```{r}
+cpm.long <- cpm %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var="transcript_ID") %>% 
+  gather(key="sample", value="log2cpm", -transcript_ID) %>%
+  separate(sample, into=c("day","time","trt"), sep = "-", remove=FALSE) %>%
+  mutate(day_time=str_c(day, "_", time))
+cpm.long
+```
+
+take top 25 down and plot
+```{r}
+topdown <- DEgenes %>% filter(logFC<0) %>% arrange(FDR) %>% pull(transcript_ID) %>% unique() %>% magrittr::extract(1:25)
+
+cpm.long %>%
+  filter(transcript_ID %in% topdown,10) %>%
+  ggplot(aes(x=day_time, y=log2cpm, group=trt, color=trt, lty=trt)) +
+  geom_line() +
+  facet_wrap(~transcript_ID) +
+  ggtitle("Top down-regulated genes")
+```
+
+```{r}
+topup <- DEgenes %>% filter(logFC>0) %>% arrange(FDR) %>% pull(transcript_ID) %>% unique() %>% magrittr::extract(1:25)
+
+cpm.long %>%
+  filter(transcript_ID %in% topup,10) %>%
+  ggplot(aes(x=day_time, y=log2cpm, group=trt, color=trt, lty=trt)) +
+  geom_line() +
+  facet_wrap(~transcript_ID) +
+  ggtitle("Top up-regulated genes")
+```

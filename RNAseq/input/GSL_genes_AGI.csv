@@ -1,0 +1,87 @@
+﻿AGI,GeneName,Pathways
+AT1G27130  ,GSTU13,Aliphatic Glucosinolate
+AT1G50110  ,BCAT?,Aliphatic Glucosinolate
+AT1G74090  ,SOT18,Aliphatic Glucosinolate
+AT1G74100  ,SOT16,Aliphatic Glucosinolate
+AT1G12140,GSOX5,Aliphatic Glucosinolate
+AT1G16410,CYP79F1,Aliphatic Glucosinolate
+AT1G18590,SOT5C,Aliphatic Glucosinolate
+AT1G62540 ,GSOX2,Aliphatic Glucosinolate
+AT1G62560,GSOX3,Aliphatic Glucosinolate
+AT1G62570,GSOX4,Aliphatic Glucosinolate
+AT1G65860,GSOX1,Aliphatic Glucosinolate
+AT1G65880,BZO1,Aliphatic Glucosinolate
+AT1G78370,GSTU20,Aliphatic Glucosinolate
+AT2G20610,CSLyase,Aliphatic Glucosinolate
+AT2G25450,GSOH,Aliphatic Glucosinolate
+AT2G31790,UGT,Aliphatic Glucosinolate
+AT3G03190,GSTF11,Aliphatic Glucosinolate
+AT3G19710,BCAT4,Aliphatic Glucosinolate
+AT3G49680,BCAT3,Aliphatic Glucosinolate
+AT4G03050,AOP3,Aliphatic Glucosinolate
+AT4G03060,AOP2,Aliphatic Glucosinolate
+AT4G12030,BAT5,Aliphatic Glucosinolate
+AT4G13770,CYP83A1,Aliphatic Glucosinolate
+AT4G31500,CYP83B1,Aliphatic Glucosinolate
+AT5G23010,MAM1,Aliphatic Glucosinolate
+AT5G23020,MAM3,Aliphatic Glucosinolate
+AT3G09710  ,IQD1,Aliphatic Regulation
+AT3G27785  ,MYB118,Aliphatic Regulation
+AT5G40360  ,MYB115,Aliphatic Regulation
+AT5G07690,MYB29,Aliphatic TF
+AT5G07700,MYB76,Aliphatic TF
+AT5G61420,MYB28,Aliphatic TF
+AT1G47600  ,TGG4,Catabolism
+AT1G52030  ,MVP1,Catabolism
+AT3G14210  ,ESM1,Catabolism
+AT5G26000  ,TGG1,Catabolism
+AT5G25980,TGG2,Catabolism
+AT1G51470,TGG5,Catabolism
+AT1G54040,ESP,Catabolism
+AT3G16400,NSP1,Catabolism
+AT2G33070,NSP2,Catabolism
+AT3G16390,NSP3,Catabolism
+AT3G16410,NSP4,Catabolism
+AT5G48180,NSP5,Catabolism
+AT1G21100  ,IGMT1,Indolic Glucosinolate
+AT1G21110  ,IGMT3,Indolic Glucosinolate
+AT1G21120  ,IGMT?,Indolic Glucosinolate
+AT1G21130  ,IGMT4,Indolic Glucosinolate
+AT2G22330  ,CYP79B3,Indolic Glucosinolate
+AT4G39950  ,CYP79B2,Indolic Glucosinolate
+AT5G57220  ,CY81F2,Indolic Glucosinolate
+AT1G24100,UGT74B,Indolic Glucosinolate
+AT2G30860,GSTF9,Indolic Glucosinolate
+AT4G35160,OMT,Indolic Glucosinolate
+AT1G76790  ,IGMT5,Indolic Glucosinolate
+AT1G18570  ,MYB51,Indolic Regulation
+AT3G06250  ,FRS7,Indolic Regulation
+AT4G24290  ,MACP2,Indolic Regulation
+AT4G28910  ,NINJA,Indolic Regulation
+AT5G18960  ,FRS17,Indolic Regulation
+AT5G60890  ,MYB34,Indolic Regulation
+AT1G18570  ,MYB51,Indolic Regulation
+AT1G74080,MYB122,Indolic Regulation
+AT1G07640  ,OB2,Indolic Regulation
+AT3G03040  ,F-Box,Miscellany
+AT4G11820  ,MVA1,Miscellany
+AT5G05260  ,CYP79A2,Miscellany
+AT5G07460,PMSR2,Miscellany
+AT5G07470,PMSR3,Miscellany
+AT5G61640,PMSR1,Miscellany
+AT1G12130  ,GS-OX6,Miscellany
+AT1G12160  ,GS-OX7,Miscellany
+AT1G18500  ,IPMS1,Precursor
+AT1G31180,IMD3,Precursor
+AT2G43100,IPMI2,Precursor
+AT3G58990,IPMI1,Precursor
+AT1G74040  ,IPMS2,Precursor
+AT3G45300  ,IVDH,Precursor
+AT4G13430  ,IIL1,Precursor
+AT5G14200  ,IMD1,Precursor
+AT1G04770  ,SDI2,Sulfur
+AT2G14750  ,APSKinase,Sulfur
+AT3G03900  ,APK3,Sulfur
+AT5G67520  ,APK4,Sulfur
+AT3G47960  ,NPF2.10,Transport
+AT5G62680  ,NPF2.11,Transport
