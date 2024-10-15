@@ -242,7 +242,7 @@ CDS.lengths <- CDS.lengths[all.expressed.genes.modules$transcript_ID]
 length(CDS.lengths) == nrow(all.expressed.genes.modules)
 ```
 
-same some results
+save some results
 
 ```{r}
 all.expressed.genes.modules.ananotated <- all.expressed.genes.modules %>% 
@@ -397,8 +397,8 @@ pl1
 ```{r}
 pl2 <- MEs.plot %>% 
   group_by(sampling_day, sampling_time, soil_trt) %>%
-  summarize(mean=mean(black),
-            sem=sd(black) / sqrt(n())) %>%
+  summarize(mean=mean(blue),
+            sem=sd(blue) / sqrt(n())) %>%
   ggplot(aes(x=soil_trt, y=mean, ymax=mean+sem, ymin=mean-sem)) +
   geom_line(aes(group=str_c(sampling_day, sampling_time))) +
   geom_errorbar(width=.2) + 
