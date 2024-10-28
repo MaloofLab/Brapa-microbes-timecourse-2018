@@ -148,7 +148,7 @@ moduleColors = labels2colors(net$colors)
 MEs = net$MEs
 colnames(MEs) <- colnames(MEs) %>% str_remove("ME") %>% as.numeric() %>% labels2colors()
 geneTree = net$dendrograms[[1]]
-save(MEs, moduleLabels, moduleColors, geneTree,file ="../output/WGCNA/live.largeCV.RData")
+save(sample.description.timecourse.live, MEs, moduleLabels, moduleColors, geneTree,file ="../output/WGCNA/live.largeCV.RData")
 
 ```
 

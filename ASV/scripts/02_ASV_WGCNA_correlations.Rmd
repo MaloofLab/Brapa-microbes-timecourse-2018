@@ -1,0 +1,209 @@
+---
+title: "ASV correlations with WGCNA Eigen genes"
+author: "Julin Maloof"
+date: "Oct 25, 2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Will focus on live samples only.  Looking for correlations between eigen genes and ASVs.
+
+
+```{r}
+library(tidyverse)
+library(phyloseq)
+library(magrittr)
+library(knitr)
+library(plyr)
+library(tidyverse)
+library(parallel)
+```
+
+## get ASV (from Scott Klasek)
+```{r}
+ps<- readRDS(file="../input/rhizo.ps")
+```
+
+
+```{r}
+asv_counts <- otu_table(ps) 
+dim(asv_counts)
+head(asv_counts[,1:10])
+```
+
+
+```{r}
+taxa <- tax_table(ps) # taxonomy data
+dim(taxa)
+head(taxa)
+```
+
+
+```{r}
+asv_samples <- sample_data(ps) %>% # sample information
+  as_tibble() %>%
+  mutate(ID=rownames(sample_data(ps)),
+         days_grown=str_pad(days_grown, 2, pad="0"), # get things formatted the same as the RNA names
+         block=str_c("blk", block),
+         inoc={str_replace(inoc, "Autoclaved", "ATM_BLANK") %>%
+             str_replace("Inoculated", "SBC_OLD")},
+         timeofday={
+           str_replace(timeofday, "9:00 AM", "1_morn") %>%
+             str_replace("14:00 PM", "2_afternoon") %>%
+             str_replace("18:00 PM", "3_evening_5.30") %>%
+             str_replace("22:00 PM", "4_night_1") %>%
+             str_replace("4:00 AM", "5_night_2")},
+         sampleID=str_c(inoc,days_grown,timeofday,block, sep = "-")) %>%
+  select("ID", everything())
+dim(asv_samples)
+asv_samples
+```
+
+```{r}
+dups <- asv_samples %>% filter(duplicated(sampleID))  %>% pull(sampleID) 
+dups
+```
+
+
+```{r}
+asvID_dups <- asv_samples %>% filter(sampleID %in% dups)
+asvID_dups
+```
+
+```{r}
+sample_data(ps)[asvID_dups$ID,] 
+```
+
+
+## reduce ASV data to live only
+
+```{r}
+asv_samples <- asv_samples %>% filter(inoc=="SBC_OLD")
+asv_counts <- asv_counts[asv_samples$ID,]
+dim(asv_counts)
+```
+
+
+## get modules
+
+```{r}
+load("../../RNAseq/output/WGCNA/net.cpm.timecourse.v3.0.log.live.largeCV.Rdata") # not needed?
+load("../../RNAseq/output/WGCNA/live.largeCV.RData")
+```
+
+### wrangle it
+
+get sample description format to match the ASVs
+```{r}
+sample.description.timecourse.live <- sample.description.timecourse.live %>%
+  mutate(sampleID = {
+    str_remove(group, "FPsc-") %>%
+      str_c(., "-blk", block)
+  }) %>%
+  select(-lib.size, -norm.factors, -genotype, -soil_trt, -group.1)
+```
+
+### missing samples from ASVs? (since there are duplicates)
+
+```{r}
+sample.description.timecourse.live %>% anti_join(asv_samples, by = "sampleID")
+```
+
+
+## get ASV and ME order to match
+
+```{r}
+samples_merged <- inner_join(asv_samples, sample.description.timecourse.live, by = "sampleID") %>%
+  select(ASV_ID=ID, RNA_ID=sample, sampleID, everything()) %>%
+  filter(!duplicated(RNA_ID)) # due to a problem with ASV sample description. hopefully can be resolved.
+samples_merged
+```
+
+
+```{r}
+MEs <- MEs[samples_merged$RNA_ID,]
+head(MEs[,1:10])
+asv_counts <- asv_counts[samples_merged$ASV_ID,]
+head(asv_counts[,1:10])
+```
+
+Let's give them the same rownames
+```{r}
+all(rownames(MEs)==samples_merged$RNA_ID) # double check!
+rownames(MEs) <- samples_merged$ASV_ID
+```
+
+
+## filter ASVs
+```{r}
+sparsity <- apply(asv_counts, 2, function(x) sum(x==0)/length(x))
+hist(sparsity)
+sparsity[sparsity>0.9] %>% hist()
+```
+
+```{r}
+asv_counts_small <- asv_counts[,sparsity< .8]
+dim(asv_counts_small)
+```
+
+## correlations
+
+```{r}
+
+detectCores()
+
+cl <- makeCluster(ceiling(detectCores()*.75))
+
+permute.cor <- function(x, y, method = "pearson", times = 1000) {
+  x.perm <- matrix(nrow=length(x), ncol=times)
+  for (i in 1:times) x.perm[,i] <- sample(x)
+  result <- parApply(cl, x.perm, 2, cor, y, method = method)
+}
+
+MEcors <- MEs %>%
+  rownames_to_column("ASV_ID") %>%
+  pivot_longer(-sampleID, names_to = "module", values_to = "expression",cols_vary = "slowest") %>%
+  nest(.by = module)
+
+#confirm order is still okay
+
+all(MEcors$data[[1]]$sampleID == rownames(asv_counts_small))
+
+system.time(MEcors <- MEcors %>%
+              mutate(pearson.r = map(data, ~ cor(.x$expression, asv_counts_small)),
+                     pearson.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small, method = "pearson")),
+                     spearman.rho = map(data, ~ cor(.x$expression, asv_counts_small, method = "spearman")),
+                     spearman.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small, method = "spearman")),
+                     kendall.tau = map(data, ~ cor(.x$expression, asv_counts_small, method = "kendall")),
+                     kendall.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small, method = "kendall")),
+                     ))
+
+MEcors <- MEcors %>%
+  mutate(pearson.99 = map_dbl(pearson.perm, ~ quantile(abs(.x), 0.99)),
+         pearson.max = map_dbl(pearson.r, max),
+         pearson.min = map_dbl(pearson.r, min),
+         pearson.n.sig.99 = map2_dbl(pearson.r, pearson.99, ~ sum(abs(.x) > .y)),
+
+         spearman.99 = map_dbl(spearman.perm, ~ quantile(abs(.x), 0.99)),
+         spearman.max = map_dbl(spearman.rho, max),
+         spearman.min = map_dbl(spearman.rho, min),
+         spearman.n.sig.99 = map2_dbl(spearman.rho, spearman.99, ~ sum(abs(.x) > .y)),
+
+         kendall.99 = map_dbl(kendall.perm, ~ quantile(abs(.x), 0.99)),
+         kendall.max = map_dbl(kendall.tau, max),
+         kendall.min = map_dbl(kendall.tau, min),
+         kendall.n.sig.99 = map2_dbl(kendall.tau, kendall.99, ~ sum(abs(.x) > .y)),
+)
+
+stopCluster(cl)
+
+MEcors %>% arrange(desc(pearson.n.sig.99)) %>% select(module, pearson.99:last_col())
+```
+```{r}
+save(MEcors, asv_counts_small, taxa, samples_merged, file = "../output/ME_ASV_cors_live.Rdata")
+```
+

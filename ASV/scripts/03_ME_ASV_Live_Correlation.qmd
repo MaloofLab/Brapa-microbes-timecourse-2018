@@ -1,0 +1,234 @@
+---
+title: "RNAseq and ASV Correlations"
+subtitle: "Time Course data; live only"
+author: "Julin Maloof"
+date: "Oct. 28, 2024"
+format: 
+  revealjs:
+    incremental: true
+    margin: 0.05
+    width: 1200
+    height: 800
+---
+
+```{r}
+library(tidyverse)
+library(phyloseq)
+load("../output/ME_ASV_cors_live.Rdata")
+MEcors <- MEcors %>% select(-ends_with(".perm"))
+go.results <- read_csv(file = "../../RNAseq/output/WGCNA/GO_ORA_WGCNA_live_genes.csv")
+go.top6 <- go.results %>% 
+  group_by(module) %>%
+  slice_min(over_represented_FDR, n=6, with_ties = FALSE) %>%
+  summarize(top_6_go = str_c(term, sep=", ", collapse = ", ")) %>%
+  mutate(top_6_go = str_replace(top_6_go, "(^(.+?, ){3})","\\1\n"))
+```
+
+
+## Methods
+
+* 142 samples treated with "SBC_OLD" inocula
+* WGCNA to cluster RNAseq
+* Require ASV to be detected in > 80% of samples
+- 927 ASVs remaining.  Too stringent?
+* Pearson, Spearman, and Kendall correlations to associate ASV with Module eigen genes
+- 1000 permutations
+- Keep associations stronger than 99% of permuted associations
+- Threshold set per module (maybe should be set analysis wide)
+
+
+## Comparing correlation methods
+
+```{r}
+MEcors %>% select(contains("n.sig")) %>% GGally::ggpairs()
+```
+
+## Top modules by Spearman {.smaller}
+
+```{r}
+MEcors %>% select(module, starts_with("spearman"), -spearman.rho) %>% 
+  slice_max(spearman.n.sig.99, n = 6) %>%
+  arrange(desc(spearman.n.sig.99)) %>% knitr::kable(digits=2)
+```
+
+## How many ASVs (out of 927) are above threshold?
+```{r}
+pl.order <- MEcors %>% arrange(desc(spearman.n.sig.99)) %>% pull(module)
+
+MEcors %>%
+  select(module, pearson.n.sig.99, spearman.n.sig.99) %>%
+  rename_with(~ str_remove(., ".n.sig.99")) %>%
+  pivot_longer(c(pearson, spearman), names_to = "method", values_to = "Sig_ASVs") %>%
+  ggplot(aes(x=module, y=Sig_ASVs, fill = method)) +
+  geom_col(position = "dodge") +
+  scale_x_discrete(limits=pl.order) +
+  theme(axis.text.x = element_text(angle=90, hjust=1, vjust=.5))
+
+```
+
+## Strongest Spearman Correlations per Module
+
+```{r}
+MEcors %>%
+  select(module, spearman.max, spearman.min) %>%
+  pivot_longer(-module) %>%
+  mutate(name = str_remove(name, "spearman.")) %>%
+  ggplot(aes(x=module, y=value, color=name)) +
+  geom_point() +
+  scale_x_discrete(limits=pl.order) +
+  theme(axis.text.x = element_text(angle=90, hjust=1, vjust=.5))
+```
+
+
+```{r, eval = FALSE}
+# trying to plot a summary of the ASVs.
+# stop for now and try plotting the top ASV for each
+
+ME.plt.data <- samples_merged %>% inner_join(MEcors$data[[6]], by = "ASV_ID") %>%
+  mutate(MEexpression = scale(expression))
+
+ASV.plt.data <- asv_counts_small[, MEcors$spearman.rho[[6]] > 0.5] %>% 
+  magrittr::add(1) %>%
+  log2() %>%
+  scale() %>% 
+  as_tibble(rownames = "ASV_ID") %>%
+  rename_with( ~ str_c(.x, "_pos"), .cols = -ASV_ID) %>%
+  inner_join(samples_merged, ., by = "ASV_ID")
+
+
+ASV.plt.data <- asv_counts_small[, MEcors$spearman.rho[[6]] < 0.5] %>%
+  magrittr::add(1) %>%
+  log2() %>%
+  scale() %>% 
+  as_tibble(rownames = "ASV_ID") %>%
+  rename_with( ~ str_c(.x, "_neg"), .cols = -ASV_ID) %>%
+  inner_join(ASV.plt.data, ., by = "ASV_ID") %>%
+  pivot_longer(c(ends_with("pos"), ends_with("neg")), names_to = c("ASV", "direction"), values_to = "ASV_abundance", names_sep = "_")
+
+ME.plt.data %>%
+  ggplot(aes(x=ASV_ID)) +
+  geom_line(aes(y=MEexpression), group = 1, lwd=1.5) +
+  #geom_line(aes(y=ASV_abundance, color = direction, group = "ASV"), alpha = 0.01, data = ASV.plt.data)
+  geom_smooth(aes(y=ASV_abundance, color = direction, group = direction), data = ASV.plt.data) 
+
+
+
+```
+
+```{r}
+plot_ME_ASV <- function(plot.module, my.MEcors = MEcors, my.asv_counts_small = asv_counts_small) {
+  
+  MEcors.plot <- my.MEcors %>% filter(module==!!plot.module)
+  
+  ME.plt.data <- samples_merged %>% inner_join(MEcors.plot$data[[1]], by = "ASV_ID") %>%
+    mutate(MEexpression = scale(expression))
+  
+  ASV.plt.data <- 
+    my.asv_counts_small[, which.max(MEcors.plot$spearman.rho[[1]])] %>% 
+    magrittr::add(1) %>%
+    log2() %>%
+    scale() %>% 
+    as_tibble(rownames = "ASV_ID") 
+  
+  ASV.plt.data <- my.asv_counts_small[, which.min(MEcors.plot$spearman.rho[[1]])] %>%
+    magrittr::add(1) %>%
+    log2() %>%
+    scale() %>% 
+    as_tibble(rownames = "ASV_ID") %>%
+    inner_join(ASV.plt.data, ., by = "ASV_ID")
+  
+  ME.plt.data <- inner_join(ME.plt.data, ASV.plt.data)
+  
+  ME.plt.data %>%
+    pivot_longer(MEexpression:last_col()) %>%
+    rename(sample=ASV_ID) %>%
+    ggplot(aes(x=sample, y = value, color = name, group = name)) +
+    geom_line(lwd=1) +
+    scale_color_discrete(type=c("magenta", "green", "black"))
+}
+```
+
+```{r}
+get_taxa <- function(module, my.taxa = taxa, my.MEcors = MEcors) {
+  my.MEcors <-  my.MEcors %>% filter(module==!!module)
+    my.taxaIDs <- c(which.max(my.MEcors$spearman.rho[[1]]),
+                 which.min(my.MEcors$spearman.rho[[1]]))
+    my.taxaIDs <- colnames(my.MEcors$spearman.rho[[1]])[my.taxaIDs]
+    my.taxa[my.taxaIDs,2:6] %>% knitr::kable()
+}
+```
+
+## Yellow module {.smaller}
+
+GO top 6
+```{r}
+module <- "yellow"
+go.top6 %>% filter(module == !!module) %>% pull(top_6_go)
+```
+
+```{r}
+get_taxa(module)
+```
+```{r}
+plot_ME_ASV(module)
+```
+
+## Brown module {.smaller}
+
+GO top 6
+```{r}
+module <- "brown"
+go.top6 %>% filter(module == !!module) %>% pull(top_6_go)
+```
+
+```{r}
+get_taxa(module)
+```
+```{r}
+plot_ME_ASV(module)
+```
+
+## Blue module {.smaller}
+
+GO top 6
+```{r}
+module <- "blue"
+go.top6 %>% filter(module == !!module) %>% pull(top_6_go)
+```
+
+```{r}
+get_taxa(module)
+```
+```{r}
+plot_ME_ASV(module)
+```
+
+## Magenta module {.smaller}
+
+GO top 6
+```{r}
+module <- "magenta"
+go.top6 %>% filter(module == !!module) %>% pull(top_6_go)
+```
+
+```{r}
+get_taxa(module)
+```
+```{r}
+plot_ME_ASV(module)
+```
+
+## Turquoise module {.smaller}
+
+GO top 6
+```{r}
+module <- "turquoise"
+go.top6 %>% filter(module == !!module) %>% pull(top_6_go)
+```
+
+```{r}
+get_taxa(module)
+```
+```{r}
+plot_ME_ASV(module)
+```
