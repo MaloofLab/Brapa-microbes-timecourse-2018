@@ -21,11 +21,11 @@ install.packages("zCompositions")
 
 
 ```{r}
-library(tidyverse)
 library(phyloseq)
 library(compositions)
 library(zCompositions)
 library(magrittr)
+library(tidyverse)
 library(knitr)
 library(parallel)
 ```
@@ -112,38 +112,22 @@ dim(asv_counts)
 ## nomalize ASV data
 
 ```{r}
-test <- matrix(c(0:10, seq(0, 100, 10)),ncol=2)
-test
-
-clr.results <- clr(t(test[-1,])) %>% t
-
-cmult.results <- cmultRepl(t(test)) %>% t
-
-clr.results
-
-cmult.results
-
-clr.cmult <- clr(t(cmult.results)) %>% t
-
-plot(clr.results[,1], cmult.results[,1])
-
-plot(clr.results[,1], log(cmult.results[,1]))
-
-plot(clr.results[,1], clr.cmult)
-```
-
-
-```{r}
 asv_norm <- asv_counts %>%
   cmultRepl() %>%
-  clr()
+  clr() 
 
 dim(asv_norm)
 
 asv_norm[1:10, 1:10]
 ```
+
 ```{r}
 asv_counts[1:10, 1:10]
+```
+We lost one sample due to sparsity, so let's update the sample description to match
+
+```{r}
+asv_samples <- asv_samples[asv_samples$ID %in% rownames(asv_norm), ]
 ```
 
 
@@ -154,7 +138,6 @@ load("../../RNAseq/output/WGCNA/net.cpm.timecourse.v3.0.log.live.largeCV.Rdata")
 load("../../RNAseq/output/WGCNA/live.largeCV.RData")
 ```
 
-I AM HERE
 
 ### wrangle it
 
@@ -168,7 +151,7 @@ sample.description.timecourse.live <- sample.description.timecourse.live %>%
   select(-lib.size, -norm.factors, -genotype, -soil_trt, -group.1)
 ```
 
-### missing samples from ASVs? (since there are duplicates)
+### missing samples from ASVs?
 
 ```{r}
 sample.description.timecourse.live %>% anti_join(asv_samples, by = "sampleID")
@@ -179,8 +162,8 @@ sample.description.timecourse.live %>% anti_join(asv_samples, by = "sampleID")
 
 ```{r}
 samples_merged <- inner_join(asv_samples, sample.description.timecourse.live, by = "sampleID") %>%
-  select(ASV_Sample_ID=ID, RNA_Sample_ID=sample, sampleID, everything()) %>%
-  filter(!duplicated(RNA_Sample_ID)) # due to a problem with ASV sample description. hopefully can be resolved.
+  select(ASV_Sample_ID=ID, RNA_Sample_ID=sample, sampleID, everything()) 
+
 samples_merged
 ```
 
@@ -188,8 +171,9 @@ samples_merged
 ```{r}
 MEs <- MEs[samples_merged$RNA_Sample_ID,]
 head(MEs[,1:10])
-asv_counts <- asv_counts[samples_merged$ASV_Sample_ID,]
-head(asv_counts[,1:10])
+asv_norm <- asv_norm[samples_merged$ASV_Sample_ID,]
+
+head(asv_norm[,1:10])
 ```
 
 Let's give them the same rownames
@@ -198,26 +182,9 @@ all(rownames(MEs)==samples_merged$RNA_Sample_ID) # double check!
 rownames(MEs) <- samples_merged$ASV_Sample_ID
 ```
 
-
-## filter ASVs
-```{r}
-sparsity <- apply(asv_counts, 2, function(x) sum(x==0)/length(x))
-hist(sparsity)
-sparsity[sparsity>0.9] %>% hist()
-```
-
-```{r}
-asv_counts_small <- asv_counts[,sparsity< .8]
-dim(asv_counts_small)
-
-asv_counts_small.log2 <- asv_counts_small %>% 
-  magrittr::add(1) %>%
-  log2() 
-
-
-```
-
 ## correlations
+
+# I AM HERE.  NEED TO CONVERT TO APPROPRIATE COR FUNCTION PER GLOOR PAPER
 
 ```{r}
 
