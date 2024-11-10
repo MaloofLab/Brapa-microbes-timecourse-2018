@@ -12,22 +12,31 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Will focus on live samples only.  Looking for correlations between eigen genes and ASVs.  This is a redo of my previous analysis but using [methods appropriate for the compositional nature of 16S seq data](https://www.frontiersin.org/journals/microbiology/articles/10.3389/fmicb.2017.02224/full)
 
+UPDATE NOV 8: this is proving somewhat challenging.  compositional correlation functions in package propr want count data as input.  So it might make sense to include the (raw) RNAseq data in that and build combined networks.  
+
+Possible approaches:
+
+1. clr data transformation of ASVs and then use the Spearman correlation I used before
+2. correlation matrix using package propr, including RNAseq data and then using SpeakEasy2 (or something else) to find networks
+3. correlation matrix using spiec-easi, including RNAseq MEs.  Currently I can't get this to work on my Mac if I use the full ASV data set because of errors in huge::huge.  This may be due to extreme sparsity, because if I filter the data to sparsity < 0.95 it works.
+
+Trying #1 below
 
 ```{r, eval=FALSE}
 install.packages("compositions")
 install.packages("zCompositions")
+devtools::install_github("zdk123/SpiecEasi")
 ```
-
-
 
 ```{r}
 library(phyloseq)
-library(compositions)
-library(zCompositions)
+#library(compositions) #using SpiecEasi instead
+#library(zCompositions)
 library(magrittr)
 library(tidyverse)
 library(knitr)
 library(parallel)
+library(SpiecEasi)
 ```
 
 ## get ASV (from Scott Klasek)
@@ -52,7 +61,7 @@ head(taxa)
 
 
 If using 2021 data set use this
-```{r}
+```{r, eval=FALSE}
 # asv_samples <- sample_data(ps) %>% # sample information
 #   as_tibble() %>%
 #   mutate(ID=rownames(sample_data(ps)),
@@ -71,7 +80,8 @@ If using 2021 data set use this
 # dim(asv_samples)
 # asv_samples
 ```
-If using 2024 data set use this.  Changing some column names to be consistent with 2021 and the code I already had written
+
+If using 2024 data set use this. 
 ```{r}
 asv_samples <- sample_data(ps) %>% # sample information
   as_tibble() %>%
@@ -111,20 +121,24 @@ dim(asv_counts)
 
 ## nomalize ASV data
 
+Note: example in help shows a norm_to_total step, but this is unnecessary (I tested it)
 ```{r}
-asv_norm <- asv_counts %>%
-  cmultRepl() %>%
-  clr() 
+sparsity <- apply(asv_counts, 2, function(x) sum(x==0)/length(x))
+asv_counts_small <- asv_counts[, sparsity < 0.95]
+dim(asv_counts_small)
 
+asv_norm <- asv_counts_small %>% clr(mar=1) %>% t()
 dim(asv_norm)
-
-asv_norm[1:10, 1:10]
 ```
 
-```{r}
-asv_counts[1:10, 1:10]
+This works on the subsetted dataset, but not on the full data set.  Will explore later.
+
+```{r, eval=FALSE}
+system.time(
+asb.cov <- sparseiCov(asv_norm[,1:1000], method = "glasso", verbose = TRUE)
+)
 ```
-We lost one sample due to sparsity, so let's update the sample description to match
+
 
 ```{r}
 asv_samples <- asv_samples[asv_samples$ID %in% rownames(asv_norm), ]
@@ -184,8 +198,7 @@ rownames(MEs) <- samples_merged$ASV_Sample_ID
 
 ## correlations
 
-# I AM HERE.  NEED TO CONVERT TO APPROPRIATE COR FUNCTION PER GLOOR PAPER
-
+Note: Kendall and Spearman are essentially the same.  Kendall is slower, removing it.
 ```{r}
 
 detectCores()
@@ -205,15 +218,13 @@ MEcors <- MEs %>%
 
 #confirm order is still okay
 
-all(MEcors$data[[1]]$ASV_Sample_ID == rownames(asv_counts_small.log2))
+all(MEcors$data[[1]]$ASV_Sample_ID == rownames(asv_norm))
 
 system.time(MEcors <- MEcors %>%
-              mutate(pearson.r = map(data, ~ cor(.x$expression, asv_counts_small.log2)),
-                     pearson.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small.log2, method = "pearson")),
-                     spearman.rho = map(data, ~ cor(.x$expression, asv_counts_small.log2, method = "spearman")),
-                     spearman.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small.log2, method = "spearman")),
-                     kendall.tau = map(data, ~ cor(.x$expression, asv_counts_small.log2, method = "kendall")),
-                     kendall.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small.log2, method = "kendall")),
+              mutate(pearson.r = map(data, ~ cor(.x$expression, asv_norm)),
+                     pearson.perm = map(data, ~ permute.cor(.x$expression, asv_norm, method = "pearson")),
+                     spearman.rho = map(data, ~ cor(.x$expression, asv_norm, method = "spearman")),
+                     spearman.perm = map(data, ~ permute.cor(.x$expression, asv_norm, method = "spearman"))
                      ))
 
 MEcors <- MEcors %>%
@@ -225,20 +236,22 @@ MEcors <- MEcors %>%
          spearman.99 = map_dbl(spearman.perm, ~ quantile(abs(.x), 0.99)),
          spearman.max = map_dbl(spearman.rho, max),
          spearman.min = map_dbl(spearman.rho, min),
-         spearman.n.sig.99 = map2_dbl(spearman.rho, spearman.99, ~ sum(abs(.x) > .y)),
-
-         kendall.99 = map_dbl(kendall.perm, ~ quantile(abs(.x), 0.99)),
-         kendall.max = map_dbl(kendall.tau, max),
-         kendall.min = map_dbl(kendall.tau, min),
-         kendall.n.sig.99 = map2_dbl(kendall.tau, kendall.99, ~ sum(abs(.x) > .y)),
+         spearman.n.sig.99 = map2_dbl(spearman.rho, spearman.99, ~ sum(abs(.x) > .y))
 )
 
 stopCluster(cl)
 
 MEcors %>% arrange(desc(pearson.n.sig.99)) %>% select(module, pearson.99:last_col())
 ```
+```{r}
+MEcors_clr <- MEcors
+asv_counts_small_clr <- asv_counts_small
+asv_norm_clr <- asv_norm
+samples_merged_clr <- samples_merged
+```
+
 
 ```{r}
-save(MEcors, asv_counts_small, asv_counts_small.log2, taxa, samples_merged, file = "../output/ME_ASV_cors_live.Rdata")
+save(MEcors_clr, asv_counts_small_clr, asv_norm_clr, taxa, samples_merged_clr, file = "../output/ME_ASV_cors_live_clr_normalization.Rdata")
 ```
 

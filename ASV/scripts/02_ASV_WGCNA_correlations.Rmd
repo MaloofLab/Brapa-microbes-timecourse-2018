@@ -118,23 +118,23 @@ sample.description.timecourse.live %>% anti_join(asv_samples, by = "sampleID")
 
 ```{r}
 samples_merged <- inner_join(asv_samples, sample.description.timecourse.live, by = "sampleID") %>%
-  select(ASV_ID=ID, RNA_ID=sample, sampleID, everything()) %>%
-  filter(!duplicated(RNA_ID)) # due to a problem with ASV sample description. hopefully can be resolved.
+  select(ASV_Sample_ID=ID, RNA_Sample_ID=sample, sampleID, everything()) %>%
+  filter(!duplicated(RNA_Sample_ID)) # due to a problem with ASV sample description. hopefully can be resolved.
 samples_merged
 ```
 
 
 ```{r}
-MEs <- MEs[samples_merged$RNA_ID,]
+MEs <- MEs[samples_merged$RNA_Sample_ID,]
 head(MEs[,1:10])
-asv_counts <- asv_counts[samples_merged$ASV_ID,]
+asv_counts <- asv_counts[samples_merged$ASV_Sample_ID,]
 head(asv_counts[,1:10])
 ```
 
 Let's give them the same rownames
 ```{r}
-all(rownames(MEs)==samples_merged$RNA_ID) # double check!
-rownames(MEs) <- samples_merged$ASV_ID
+all(rownames(MEs)==samples_merged$RNA_Sample_ID) # double check!
+rownames(MEs) <- samples_merged$ASV_Sample_ID
 ```
 
 
@@ -148,6 +148,12 @@ sparsity[sparsity>0.9] %>% hist()
 ```{r}
 asv_counts_small <- asv_counts[,sparsity< .8]
 dim(asv_counts_small)
+
+asv_counts_small.log2 <- asv_counts_small %>% 
+  magrittr::add(1) %>%
+  log2() 
+
+
 ```
 
 ## correlations
@@ -165,21 +171,21 @@ permute.cor <- function(x, y, method = "pearson", times = 1000) {
 }
 
 MEcors <- MEs %>%
-  rownames_to_column("ASV_ID") %>%
-  pivot_longer(-sampleID, names_to = "module", values_to = "expression",cols_vary = "slowest") %>%
+  rownames_to_column("ASV_Sample_ID") %>%
+  pivot_longer(-ASV_Sample_ID, names_to = "module", values_to = "expression",cols_vary = "slowest") %>%
   nest(.by = module)
 
 #confirm order is still okay
 
-all(MEcors$data[[1]]$sampleID == rownames(asv_counts_small))
+all(MEcors$data[[1]]$ASV_Sample_ID == rownames(asv_counts_small.log2))
 
 system.time(MEcors <- MEcors %>%
-              mutate(pearson.r = map(data, ~ cor(.x$expression, asv_counts_small)),
-                     pearson.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small, method = "pearson")),
-                     spearman.rho = map(data, ~ cor(.x$expression, asv_counts_small, method = "spearman")),
-                     spearman.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small, method = "spearman")),
-                     kendall.tau = map(data, ~ cor(.x$expression, asv_counts_small, method = "kendall")),
-                     kendall.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small, method = "kendall")),
+              mutate(pearson.r = map(data, ~ cor(.x$expression, asv_counts_small.log2)),
+                     pearson.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small.log2, method = "pearson")),
+                     spearman.rho = map(data, ~ cor(.x$expression, asv_counts_small.log2, method = "spearman")),
+                     spearman.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small.log2, method = "spearman")),
+                     kendall.tau = map(data, ~ cor(.x$expression, asv_counts_small.log2, method = "kendall")),
+                     kendall.perm = map(data, ~ permute.cor(.x$expression, asv_counts_small.log2, method = "kendall")),
                      ))
 
 MEcors <- MEcors %>%
@@ -203,7 +209,8 @@ stopCluster(cl)
 
 MEcors %>% arrange(desc(pearson.n.sig.99)) %>% select(module, pearson.99:last_col())
 ```
+
 ```{r}
-save(MEcors, asv_counts_small, taxa, samples_merged, file = "../output/ME_ASV_cors_live.Rdata")
+save(MEcors, asv_counts_small, asv_counts_small.log2, taxa, samples_merged, file = "../output/ME_ASV_cors_live.Rdata")
 ```
 
